@@ -7,11 +7,13 @@ import json
 import os
 import socket
 import time
+import unicodedata
 
 import redis
 from flask import Flask, jsonify, request
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
+from werkzeug.exceptions import HTTPException
 
 app = Flask(__name__)
 
@@ -20,6 +22,14 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
 LIST_TTL = int(os.environ.get("LIST_TTL", "30"))    # giây
 STATS_TTL = int(os.environ.get("STATS_TTL", "60"))  # giây
 HOSTNAME = os.environ.get("INSTANCE_NAME") or socket.gethostname()
+
+MAX_TEXT_LEN = 100
+MAX_EVENT_LEN = 150
+DEFAULT_CATEGORY = "Khac"
+DEFAULT_PAGE_SIZE = 10
+MAX_PAGE_SIZE = 100
+DEFAULT_CAT_LIMIT = 20
+MAX_CAT_LIMIT = 50
 
 _pool = None
 _redis = redis.Redis.from_url(REDIS_URL, decode_responses=True,
@@ -76,9 +86,50 @@ def cache_delete(*keys):
         pass
 
 
+def clean_text(raw, max_len=MAX_TEXT_LEN):
+    """Loại bỏ ký tự điều khiển, bỏ khoảng trắng đầu/cuối và cắt độ dài tối đa."""
+    if raw is None:
+        return ""
+    cleaned = "".join(ch for ch in str(raw) if unicodedata.category(ch) != "Cc")
+    return cleaned.strip()[:max_len].strip()
+
+
+def escape_like(value):
+    """Escape ký tự đặc biệt của ILIKE (\\, %, _) để khớp như ký tự thường."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def parse_bounded_int(raw, default, min_val, max_val=None):
+    if raw is None or str(raw).strip() == "":
+        return default
+    try:
+        val = int(str(raw).strip())
+    except ValueError:
+        return default
+    if val < min_val:
+        val = min_val
+    if max_val is not None and val > max_val:
+        val = max_val
+    return val
+
+
 def serialize(row):
-    return {"id": row["id"], "event": row["event"], "price": float(row["price"]),
-            "quantity": row["quantity"], "created_at": row["created_at"].isoformat()}
+    return {
+        "id": row["id"],
+        "event": row["event"],
+        "price": float(row["price"]),
+        "quantity": row["quantity"],
+        "category": row.get("category") or DEFAULT_CATEGORY,
+        "created_at": row["created_at"].isoformat(),
+    }
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(err):
+    if isinstance(err, HTTPException):
+        return jsonify(error=err.description), err.code
+    app.logger.error("Unhandled server error: %s", type(err).__name__)
+    return jsonify(error="Lỗi hệ thống nội bộ"), 500
 
 
 @app.get("/api/tickets/health")
@@ -91,17 +142,98 @@ def whoami():
     return jsonify(served_by=HOSTNAME)
 
 
+@app.get("/api/tickets/categories")
+def list_categories():
+    q = clean_text(request.args.get("q"), MAX_TEXT_LEN)
+    limit = parse_bounded_int(request.args.get("limit"), DEFAULT_CAT_LIMIT, 1, MAX_CAT_LIMIT)
+    if q:
+        rows = query(
+            "SELECT DISTINCT category FROM tickets "
+            "WHERE category ILIKE %s ESCAPE '\\' "
+            "ORDER BY category ASC LIMIT %s",
+            (f"%{escape_like(q)}%", limit),
+        )
+    else:
+        rows = query(
+            "SELECT DISTINCT category FROM tickets ORDER BY category ASC LIMIT %s",
+            (limit,),
+        )
+    items = [r["category"] for r in rows]
+    return jsonify(items=items, total=len(items), served_by=HOSTNAME)
+
+
 @app.get("/api/tickets")
 def list_tickets():
     t0 = time.perf_counter()
-    data = cache_get("tickets:list")
-    status = "HIT"
-    if data is None:
-        status = "MISS"
-        data = [serialize(r) for r in query("SELECT * FROM tickets ORDER BY id")]
-        cache_set("tickets:list", data, LIST_TTL)
-    resp = jsonify(items=data, cache=status, served_by=HOSTNAME,
-                   elapsed_ms=round((time.perf_counter() - t0) * 1000, 2))
+    q = clean_text(request.args.get("q"), MAX_TEXT_LEN)
+    category = clean_text(request.args.get("category"), MAX_TEXT_LEN)
+    raw_page = request.args.get("page")
+    raw_page_size = request.args.get("page_size")
+
+    has_page = raw_page is not None and raw_page.strip() != ""
+    has_page_size = raw_page_size is not None and raw_page_size.strip() != ""
+    has_params = bool(q or category or has_page or has_page_size)
+
+    if not has_params:
+        data = cache_get("tickets:list")
+        status = "HIT"
+        if data is None:
+            status = "MISS"
+            data = [serialize(r) for r in query("SELECT * FROM tickets ORDER BY id ASC")]
+            cache_set("tickets:list", data, LIST_TTL)
+        total = len(data)
+        page = 1
+        page_size = total
+        total_pages = 1 if total > 0 else 0
+    else:
+        status = "BYPASS"
+        clauses = []
+        params = []
+        if q:
+            clauses.append("event ILIKE %s ESCAPE '\\'")
+            params.append(f"%{escape_like(q)}%")
+        if category:
+            clauses.append("category = %s")
+            params.append(category)
+        where_sql = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+
+        if has_page or has_page_size:
+            page_size = parse_bounded_int(raw_page_size, DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE)
+            count_row = query(f"SELECT COUNT(*) AS cnt FROM tickets{where_sql}", tuple(params) or None)[0]
+            total = int(count_row["cnt"])
+            total_pages = (total + page_size - 1) // page_size if total > 0 else 0
+            req_page = parse_bounded_int(raw_page, 1, 1)
+            page = min(req_page, total_pages) if total_pages > 0 else 1
+            if total == 0:
+                data = []
+            else:
+                offset = (page - 1) * page_size
+                rows = query(
+                    f"SELECT * FROM tickets{where_sql} ORDER BY id ASC LIMIT %s OFFSET %s",
+                    tuple(params) + (page_size, offset),
+                )
+                data = [serialize(r) for r in rows]
+        else:
+            rows = query(
+                f"SELECT * FROM tickets{where_sql} ORDER BY id ASC",
+                tuple(params) or None,
+            )
+            data = [serialize(r) for r in rows]
+            total = len(data)
+            page = 1
+            page_size = total
+            total_pages = 1 if total > 0 else 0
+
+    resp = jsonify(
+        items=data,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+        cache=status,
+        served_by=HOSTNAME,
+        elapsed_ms=round((time.perf_counter() - t0) * 1000, 2),
+    )
     resp.headers["X-Cache"] = status
     return resp
 
@@ -137,7 +269,8 @@ def get_ticket(ticket_id):
 @app.post("/api/tickets")
 def create_ticket():
     body = request.get_json(silent=True) or {}
-    event = str(body.get("event", "")).strip()
+    event = clean_text(body.get("event", ""), MAX_EVENT_LEN)
+    category = clean_text(body.get("category"), MAX_TEXT_LEN) or DEFAULT_CATEGORY
     try:
         price = float(body.get("price"))
         quantity = int(body.get("quantity"))
@@ -145,7 +278,10 @@ def create_ticket():
         return jsonify(error="price và quantity phải là số"), 400
     if not event or price < 0 or quantity < 0:
         return jsonify(error="dữ liệu không hợp lệ"), 400
-    row = query("INSERT INTO tickets (event, price, quantity) VALUES (%s,%s,%s) RETURNING *",
-                (event, price, quantity), commit=True)[0]
+    row = query(
+        "INSERT INTO tickets (event, price, quantity, category) VALUES (%s,%s,%s,%s) RETURNING *",
+        (event, price, quantity, category),
+        commit=True,
+    )[0]
     cache_delete("tickets:list", "tickets:stats")  # vô hiệu hoá cache khi dữ liệu đổi
     return jsonify(ticket=serialize(row), served_by=HOSTNAME), 201

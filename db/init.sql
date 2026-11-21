@@ -10,8 +10,8 @@ CREATE TABLE users (
   created_at TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 INSERT INTO users (name, email) VALUES
-  ('Nguoi dung mau 01', 'user01@example.com'),
-  ('Nguoi dung mau 02', 'user02@example.com');
+  ('test01', 'user01@example.com'),
+  ('test02', 'user02@example.com');
 
 \connect tickets_db
 CREATE TABLE tickets (
@@ -19,10 +19,11 @@ CREATE TABLE tickets (
   event      VARCHAR(150) NOT NULL,
   price      NUMERIC(12,2) NOT NULL CHECK (price >= 0),
   quantity   INTEGER NOT NULL CHECK (quantity >= 0),
+  category   VARCHAR(100) NOT NULL DEFAULT 'Khac',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 -- Dữ liệu mẫu (seed) phục vụ demo, không phải dữ liệu thật
-INSERT INTO tickets (event, price, quantity) VALUES
-  ('Su kien mau A', 150000, 100),
-  ('Su kien mau B', 250000, 50),
-  ('Su kien mau C', 500000, 20);
+INSERT INTO tickets (event, price, quantity, category) VALUES
+  ('Su kien mau A', 150000, 100, 'Hoi thao'),
+  ('Su kien mau B', 250000, 50, 'Hoi thao'),
+  ('Su kien mau C', 500000, 20, 'Am nhac');
