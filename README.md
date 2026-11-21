@@ -72,6 +72,14 @@ docker compose down      # dừng container, giữ lại dữ liệu PostgreSQL
 docker compose down -v   # dừng container và xoá luôn dữ liệu PostgreSQL
 ```
 
+## Kịch bản demo bảo vệ trọn gói (1 lệnh duy nhất)
+Chạy đầy đủ 7 phần ấn tượng (kiến trúc & cách ly mạng `edge`/`data`, tìm kiếm/lọc/chống SQLi dạng bảng, biểu đồ tăng tốc Redis ~100× & Cache Invalidation, **Graceful Degradation khi tắt hẳn Redis**, scale 3 replica + biểu đồ phân phối tải, **Chaos Failover giết nóng 1 replica giữa luồng tải đa luồng với 0% lỗi**, và 11 test tự động):
+```bash
+./scripts/demo_baove.sh          # Chế độ thuyết trình (nhấn Enter giữa từng phần)
+./scripts/demo_baove.sh --auto   # Chạy tự động toàn bộ từ đầu tới cuối
+./scripts/demo_baove.sh --menu   # Menu chọn nhanh từng phần khi thầy hỏi đáp
+```
+
 ## Kiểm thử tìm kiếm, lọc danh mục và phân trang
 ```bash
 python3 scripts/test_search.py
