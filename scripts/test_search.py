@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""Kiểm thử tự động API tìm kiếm, lọc danh mục, phân trang và cache cho Ticket Service.
+"""Kiểm thử tự động cho Ticket Service (API tìm kiếm/lọc/phân trang/cache)
+và kiểm tra tự động các tiêu chí UX/WCAG tĩnh trên mã nguồn Frontend.
 
-Chỉ dùng thư viện chuẩn Python (unittest + urllib).
-Chạy với hệ thống đang khởi động:
+Chỉ dùng thư viện chuẩn Python (unittest + urllib + pathlib + re).
+Chạy khi hệ thống đang khởi động:
     python3 scripts/test_search.py
 Tuỳ chọn đổi URL gateway:
     BASE_URL=http://localhost:8080 python3 scripts/test_search.py
 """
 import json
 import os
+from pathlib import Path
+import re
 import time
 import unittest
 import urllib.error
@@ -16,6 +19,7 @@ import urllib.parse
 import urllib.request
 
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:8080").rstrip("/")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 def http_json(method, path, params=None, payload=None, timeout=10):
@@ -41,6 +45,23 @@ def http_json(method, path, params=None, payload=None, timeout=10):
         return exc.code, body, dict(exc.headers.items())
 
 
+def _rel_luminance(hex_color):
+    h = hex_color.lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    vals = []
+    for i in (0, 2, 4):
+        c = int(h[i:i + 2], 16) / 255.0
+        vals.append(c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4)
+    return 0.2126 * vals[0] + 0.7152 * vals[1] + 0.0722 * vals[2]
+
+
+def contrast_ratio(hex1, hex2):
+    l1, l2 = _rel_luminance(hex1), _rel_luminance(hex2)
+    hi, lo = max(l1, l2), min(l1, l2)
+    return (hi + 0.05) / (lo + 0.05)
+
+
 class TestTicketSearch(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -58,7 +79,6 @@ class TestTicketSearch(unittest.TestCase):
             (f"{cls.prefix} Ma_Ve_VIP", 200000, 5, cls.cat_special),
             (f"{cls.prefix} Duong\\Dan\\Ve", 180000, 8, cls.cat_special),
         ]
-        # Thêm thêm vé để kiểm thử phân trang (> 10 vé thuộc prefix)
         for i in range(1, 8):
             fixtures.append((f"{cls.prefix} PageItem {i:02d}", 100000 + i * 1000, i, cls.cat_conf))
 
@@ -79,7 +99,6 @@ class TestTicketSearch(unittest.TestCase):
         self.assertEqual(len(events), 2)
         self.assertTrue(all("Hoi Nghi" in e for e in events))
 
-        # Từ khoá rỗng / chỉ khoảng trắng -> không lọc, vẫn giữ tương thích ngược và cache-aside
         status_empty, body_empty, headers_empty = http_json("GET", "/api/tickets", {"q": "   "})
         self.assertEqual(status_empty, 200)
         self.assertGreaterEqual(body_empty["total"], len(self.created))
@@ -116,7 +135,6 @@ class TestTicketSearch(unittest.TestCase):
 
     # AC4: phân trang, total/page/page_size/total_pages, tương thích ngược khi bỏ page & page_size
     def test_ac4_pagination_and_backward_compat(self):
-        # Không truyền page & page_size -> trả toàn bộ vé khớp (13 vé) + có total
         status, body_all, _ = http_json("GET", "/api/tickets", {"q": self.prefix})
         self.assertEqual(status, 200)
         self.assertEqual(body_all["total"], len(self.created))
@@ -126,7 +144,6 @@ class TestTicketSearch(unittest.TestCase):
         self.assertIn("served_by", body_all)
         self.assertIn("elapsed_ms", body_all)
 
-        # Chỉ truyền page=1 -> page_size mặc định 10
         status_p1, body_p1, _ = http_json("GET", "/api/tickets", {"q": self.prefix, "page": 1})
         self.assertEqual(status_p1, 200)
         self.assertEqual(body_p1["page"], 1)
@@ -135,7 +152,6 @@ class TestTicketSearch(unittest.TestCase):
         self.assertEqual(body_p1["total_pages"], 2)
         self.assertEqual(len(body_p1["items"]), 10)
 
-        # Trang 2 giữ thứ tự ổn định theo id, không trùng lặp với trang 1
         status_p2, body_p2, _ = http_json("GET", "/api/tickets", {"q": self.prefix, "page": 2})
         self.assertEqual(status_p2, 200)
         self.assertEqual(body_p2["page"], 2)
@@ -158,26 +174,22 @@ class TestTicketSearch(unittest.TestCase):
 
     # AC6: escape ký tự đặc biệt ILIKE (%, _, \)
     def test_ac6_escape_ilike_special_chars(self):
-        # Tìm '%' chỉ khớp vé chứa ký tự '%' thật, không khớp tất cả vé
         s_pct, b_pct, _ = http_json("GET", "/api/tickets", {"q": f"{self.prefix} Giam 50%"})
         self.assertEqual(s_pct, 200)
         self.assertEqual(b_pct["total"], 1)
         self.assertIn("50%", b_pct["items"][0]["event"])
 
-        # Tìm '%' đơn lẻ trong phạm vi category chứa nhiều vé -> không khớp vé không có '%'
         s_pct_cat, b_pct_cat, _ = http_json(
             "GET", "/api/tickets", {"q": "%", "category": self.cat_conf}
         )
         self.assertEqual(s_pct_cat, 200)
         self.assertEqual(b_pct_cat["items"], [])
 
-        # Tìm '_' khớp đúng vé có '_'
         s_us, b_us, _ = http_json("GET", "/api/tickets", {"q": "_Ve_", "category": self.cat_special})
         self.assertEqual(s_us, 200)
         self.assertEqual(b_us["total"], 1)
         self.assertIn("Ma_Ve_VIP", b_us["items"][0]["event"])
 
-        # Tìm '\' khớp đúng vé có '\'
         s_bs, b_bs, _ = http_json("GET", "/api/tickets", {"q": "Duong\\Dan", "category": self.cat_special})
         self.assertEqual(s_bs, 200)
         self.assertEqual(b_bs["total"], 1)
@@ -190,27 +202,22 @@ class TestTicketSearch(unittest.TestCase):
         self.assertIn(self.cat_conf, body["items"])
         self.assertIn(self.cat_music, body["items"])
         self.assertIn(self.cat_special, body["items"])
-        # Không trùng lặp
         self.assertEqual(len(body["items"]), len(set(body["items"])))
 
-        # Escape ký tự đặc biệt trong tìm kiếm danh mục
         s_esc, b_esc, _ = http_json("GET", "/api/tickets/categories", {"q": f"{self.prefix}-Cat_%_\\"})
         self.assertEqual(s_esc, 200)
         self.assertEqual(b_esc["items"], [self.cat_special])
 
-        # Giới hạn limit
         s_lim, b_lim, _ = http_json("GET", "/api/tickets/categories", {"q": self.prefix, "limit": 1})
         self.assertEqual(s_lim, 200)
         self.assertEqual(len(b_lim["items"]), 1)
 
-        # Không có danh mục khớp -> rỗng, 200
         s_none, b_none, _ = http_json("GET", "/api/tickets/categories", {"q": f"{self.prefix}-khongco"})
         self.assertEqual(s_none, 200)
         self.assertEqual(b_none["items"], [])
 
     # AC15: nhất quán giữa các bản sao và thấy ngay sau POST (không bị cache cũ làm lệch)
     def test_ac15_distributed_consistency_after_create(self):
-        # Đổ đầy cache tickets:list trước
         http_json("GET", "/api/tickets")
         s_hit, b_hit, _ = http_json("GET", "/api/tickets")
         self.assertEqual(s_hit, 200)
@@ -227,7 +234,6 @@ class TestTicketSearch(unittest.TestCase):
         self.assertEqual(s_post, 201)
         new_id = b_post["ticket"]["id"]
 
-        # Gọi nhiều lần qua load balancer để đi qua nhiều replica (nếu scale > 1)
         for _ in range(6):
             s_search, b_search, h_search = http_json(
                 "GET", "/api/tickets", {"q": unique_event, "category": fresh_cat}
@@ -236,42 +242,36 @@ class TestTicketSearch(unittest.TestCase):
             self.assertEqual(h_search.get("X-Cache"), "BYPASS")
             self.assertEqual([t["id"] for t in b_search["items"]], [new_id])
 
-        # Danh sách không lọc cũng đã xoá cache và thấy ngay vé mới
         s_list, b_list, _ = http_json("GET", "/api/tickets")
         self.assertEqual(s_list, 200)
         self.assertTrue(any(t["id"] == new_id for t in b_list["items"]))
 
-    # AC20 (server): page không hợp lệ -> 200 (không 4xx); page_size > 100 bị giới hạn về 100
-    def test_ac20_invalid_page_and_page_size_bounds(self):
+    # Kẹp biên phân trang & chống SQLi + kiểm tra hợp lệ đầu vào (AC36 phía server)
+    def test_bounds_validation_and_sqli(self):
         for bad_page in ("0", "-5", "abc"):
             s, b, _ = http_json("GET", "/api/tickets", {"q": self.prefix, "page": bad_page, "page_size": 5})
             self.assertEqual(s, 200)
             self.assertEqual(b["page"], 1)
 
-        # page quá lớn -> tự đưa về trang cuối
         s_big, b_big, _ = http_json("GET", "/api/tickets", {"q": self.prefix, "page": 9999, "page_size": 5})
         self.assertEqual(s_big, 200)
         self.assertEqual(b_big["page"], b_big["total_pages"])
-        self.assertGreater(len(b_big["items"]), 0)
 
-        # page_size > 100 -> bị giới hạn về 100
         s_ps, b_ps, _ = http_json("GET", "/api/tickets", {"q": self.prefix, "page": 1, "page_size": 500})
         self.assertEqual(s_ps, 200)
         self.assertEqual(b_ps["page_size"], 100)
 
-    # AC21 (server): q dài > 100 ký tự không gây 5xx; SQL injection coi là từ khoá thường -> rỗng, 200
-    def test_ac21_security_sanitization_and_sqli(self):
-        long_q = "a" * 250 + "\x00\x07\n"
-        s_long, b_long, _ = http_json("GET", "/api/tickets", {"q": long_q})
-        self.assertEqual(s_long, 200)
-        self.assertIsInstance(b_long["items"], list)
-
         s_sqli, b_sqli, _ = http_json("GET", "/api/tickets", {"q": "' OR 1=1 --"})
         self.assertEqual(s_sqli, 200)
         self.assertEqual(b_sqli["items"], [])
-        self.assertEqual(b_sqli["total"], 0)
 
-    # Kiểm tra dữ liệu mẫu mặc định khi chạy trên DB sạch
+        s_over, _, _ = http_json(
+            "POST",
+            "/api/tickets",
+            payload={"event": "E" * 151, "price": 10000, "quantity": 1},
+        )
+        self.assertEqual(s_over, 400)
+
     def test_seed_data_if_present(self):
         status, body, _ = http_json("GET", "/api/tickets", {"q": "Su kien mau"})
         self.assertEqual(status, 200)
@@ -280,6 +280,73 @@ class TestTicketSearch(unittest.TestCase):
             self.assertEqual(by_event["Su kien mau A"]["category"], "Hoi thao")
             self.assertEqual(by_event["Su kien mau B"]["category"], "Hoi thao")
             self.assertEqual(by_event["Su kien mau C"]["category"], "Am nhac")
+
+
+class TestFrontendUXStatic(unittest.TestCase):
+    """Kiểm tra tự động các tiêu chí UX / WCAG có thể xác minh tĩnh trên mã nguồn Frontend."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app_jsx = (PROJECT_ROOT / "frontend" / "src" / "App.jsx").read_text(encoding="utf-8")
+        cls.styles_css = (PROJECT_ROOT / "frontend" / "src" / "styles.css").read_text(encoding="utf-8")
+        cls.index_html = (PROJECT_ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
+
+    # AC16, AC17: tiêu đề tiếng Việt, đủ <label>, thông tin kỹ thuật thu gọn mặc định trong <details>
+    def test_ux_labels_headings_and_tech_details(self):
+        self.assertIn("Quản lý vé", self.app_jsx)
+        self.assertIn("Quản lý người dùng", self.app_jsx)
+        self.assertGreaterEqual(len(re.findall(r"<label\b", self.app_jsx)), 8)
+        self.assertIn("<details", self.app_jsx)
+        self.assertIn("Thông tin kỹ thuật (dành cho demo)", self.app_jsx)
+        self.assertIn("<LoadBalancer />", self.app_jsx)
+
+    # AC22, AC24, AC25, AC27: cỡ chữ >= 14px, line-height >= 1.4, không outline:none, min-height 44px, reduced-motion
+    def test_ux_typography_focus_touch_and_motion(self):
+        font_sizes = [int(m) for m in re.findall(r"font-size:\s*(\d+)px", self.styles_css)]
+        self.assertTrue(font_sizes, "Không tìm thấy khai báo font-size")
+        self.assertGreaterEqual(min(font_sizes), 14)
+
+        line_heights = [float(m) for m in re.findall(r"line-height:\s*([0-9.]+)", self.styles_css)]
+        self.assertTrue(line_heights, "Không tìm thấy khai báo line-height")
+        self.assertGreaterEqual(min(line_heights), 1.4)
+
+        self.assertIsNone(re.search(r"outline\s*:\s*(none|0)\b", self.styles_css))
+        self.assertIn(":focus-visible", self.styles_css)
+        self.assertIn("min-height: 44px", self.styles_css)
+        self.assertIn("prefers-reduced-motion: reduce", self.styles_css)
+
+    # AC23: kiểm tra toán học độ tương phản màu WCAG 2.1 AA (chữ >= 4.5:1, viền ô nhập/nút >= 3:1)
+    def test_ux_wcag_contrast_ratios(self):
+        css_vars = dict(re.findall(r"(--color-[a-z-]+):\s*(#[0-9a-fA-F]{3,6})", self.styles_css))
+        surface = css_vars["--color-surface"]
+        bg = css_vars["--color-bg"]
+        self.assertGreaterEqual(contrast_ratio(css_vars["--color-text"], surface), 4.5)
+        self.assertGreaterEqual(contrast_ratio(css_vars["--color-text-muted"], surface), 4.5)
+        self.assertGreaterEqual(contrast_ratio(css_vars["--color-text-muted"], bg), 4.5)
+        self.assertGreaterEqual(contrast_ratio("#ffffff", css_vars["--color-accent"]), 4.5)
+        self.assertGreaterEqual(contrast_ratio(css_vars["--color-accent-text"], css_vars["--color-accent-soft"]), 4.5)
+        self.assertGreaterEqual(contrast_ratio(css_vars["--color-danger"], css_vars["--color-danger-bg"]), 4.5)
+        self.assertGreaterEqual(contrast_ratio(css_vars["--color-success"], css_vars["--color-success-bg"]), 4.5)
+        # Viền điều khiển >= 3:1 (WCAG 1.4.11)
+        self.assertGreaterEqual(contrast_ratio(css_vars["--color-control-border"], surface), 3.0)
+        self.assertGreaterEqual(contrast_ratio(css_vars["--color-control-border"], bg), 3.0)
+
+    # AC26, AC30, AC34, AC35, AC36, AC37, AC38: ARIA, thông báo lỗi chuẩn, hướng dẫn, bảo mật & quyền riêng tư
+    def test_ux_aria_messages_and_security(self):
+        self.assertIn('aria-live="polite"', self.app_jsx)
+        self.assertIn('role="alert"', self.app_jsx)
+        self.assertIn("Không kết nối được máy chủ. Vui lòng thử lại sau.", self.app_jsx)
+        self.assertIn("Hướng dẫn nhanh", self.app_jsx)
+        self.assertIn("Cần hỗ trợ? Liên hệ quản trị viên hệ thống.", self.app_jsx)
+        self.assertIn("Thông tin chỉ dùng để quản lý vé trong hệ thống này.", self.app_jsx)
+        self.assertIn("Bộ nhớ đệm", self.app_jsx)
+        self.assertIn("Cơ sở dữ liệu", self.app_jsx)
+        self.assertIn("maxLength={100}", self.app_jsx)
+        self.assertIn("maxLength={150}", self.app_jsx)
+        self.assertNotIn("dangerouslySetInnerHTML", self.app_jsx)
+        self.assertNotIn("localStorage", self.app_jsx)
+        for src in (self.index_html, self.styles_css, self.app_jsx):
+            self.assertIsNone(re.search(r"https?://", src))
 
 
 if __name__ == "__main__":

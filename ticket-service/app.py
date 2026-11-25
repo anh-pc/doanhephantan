@@ -4,6 +4,7 @@ Dịch vụ KHÔNG giữ trạng thái (stateless): dữ liệu bền vững ở
 dữ liệu cache ở Redis dùng chung -> có thể chạy nhiều bản sao (replica) phía sau load balancer.
 """
 import json
+import math
 import os
 import socket
 import time
@@ -269,14 +270,26 @@ def get_ticket(ticket_id):
 @app.post("/api/tickets")
 def create_ticket():
     body = request.get_json(silent=True) or {}
-    event = clean_text(body.get("event", ""), MAX_EVENT_LEN)
-    category = clean_text(body.get("category"), MAX_TEXT_LEN) or DEFAULT_CATEGORY
+    raw_event = body.get("event", "")
+    raw_category = body.get("category")
+    event = "".join(ch for ch in str(raw_event or "") if unicodedata.category(ch) != "Cc").strip()
+    cat_clean = "".join(ch for ch in str(raw_category or "") if unicodedata.category(ch) != "Cc").strip()
+    if len(event) > MAX_EVENT_LEN or len(cat_clean) > MAX_TEXT_LEN:
+        return jsonify(error="dữ liệu vượt quá độ dài cho phép"), 400
+    category = cat_clean or DEFAULT_CATEGORY
+
+    raw_price = body.get("price")
+    raw_qty = body.get("quantity")
+    if isinstance(raw_price, bool) or isinstance(raw_qty, bool):
+        return jsonify(error="price và quantity phải là số"), 400
     try:
-        price = float(body.get("price"))
-        quantity = int(body.get("quantity"))
+        price = float(raw_price)
+        quantity = int(raw_qty)
+        if float(raw_qty) != quantity:
+            return jsonify(error="quantity phải là số nguyên"), 400
     except (TypeError, ValueError):
         return jsonify(error="price và quantity phải là số"), 400
-    if not event or price < 0 or quantity < 0:
+    if not math.isfinite(price) or not event or price < 0 or price > 9999999999.99 or quantity < 0:
         return jsonify(error="dữ liệu không hợp lệ"), 400
     row = query(
         "INSERT INTO tickets (event, price, quantity, category) VALUES (%s,%s,%s,%s) RETURNING *",
