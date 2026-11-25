@@ -67,6 +67,39 @@ function formatCacheSource(cacheValue) {
   return 'Chưa có dữ liệu';
 }
 
+function getInitial(name) {
+  const s = String(name || '').trim();
+  return s ? s[0].toUpperCase() : 'U';
+}
+
+function IconTicket() {
+  return (
+    <svg className="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13 6v2m0 4v2" />
+    </svg>
+  );
+}
+
+function IconUsers() {
+  return (
+    <svg className="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function IconSearch() {
+  return (
+    <svg className="search-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}
+
 function Users({ onTechInfo }) {
   const [items, setItems] = useState([]);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -164,7 +197,16 @@ function Users({ onTechInfo }) {
 
   return (
     <section className="card panel" aria-labelledby="users-heading">
-      <h2 id="users-heading">Quản lý người dùng</h2>
+      <div className="panel-header">
+        <div className="panel-title-group">
+          <span className="panel-icon"><IconUsers /></span>
+          <div>
+            <h2 id="users-heading">Quản lý người dùng</h2>
+            <p className="panel-subtitle">Danh sách tài khoản đăng ký trong hệ thống</p>
+          </div>
+        </div>
+        {hasLoaded && <span className="count-pill">{items.length} tài khoản</span>}
+      </div>
 
       {loadError && (
         <div className="state-box state-error" role="alert">
@@ -196,15 +238,20 @@ function Users({ onTechInfo }) {
           <ul className="entity-list" aria-label="Danh sách người dùng">
             {items.map(u => (
               <li key={u.id} className="entity-item">
-                <span className="entity-primary">{u.name}</span>
-                <span className="entity-secondary">{u.email}</span>
+                <div className="user-info">
+                  <span className="user-avatar" aria-hidden="true">{getInitial(u.name)}</span>
+                  <div className="user-text">
+                    <span className="entity-primary">{u.name}</span>
+                    <span className="entity-secondary">{u.email}</span>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>
         )}
       </div>
 
-      <form className="create-form" onSubmit={handleSubmit} noValidate aria-label="Thêm người dùng mới">
+      <form className="create-form form-surface" onSubmit={handleSubmit} noValidate aria-label="Thêm người dùng mới">
         <h3 className="form-heading">Thêm người dùng mới</h3>
         <div className="form-stack">
           <div className="field">
@@ -250,9 +297,11 @@ function Users({ onTechInfo }) {
           </div>
         </div>
 
-        <button type="submit" className="btn-primary" disabled={submitting}>
-          {submitting ? 'Đang gửi...' : 'Thêm người dùng'}
-        </button>
+        <div className="form-submit-row">
+          <button type="submit" className="btn-primary" disabled={submitting}>
+            {submitting ? 'Đang gửi...' : '+ Thêm người dùng'}
+          </button>
+        </div>
 
         {feedback.type === 'success' && (
           <p className="feedback feedback-success" role="status" aria-live="polite">
@@ -629,7 +678,16 @@ function Tickets({ onTechInfo }) {
 
   return (
     <section className="card panel ticket-panel" aria-labelledby="tickets-heading">
-      <h2 id="tickets-heading">Quản lý vé</h2>
+      <div className="panel-header">
+        <div className="panel-title-group">
+          <span className="panel-icon"><IconTicket /></span>
+          <div>
+            <h2 id="tickets-heading">Quản lý vé</h2>
+            <p className="panel-subtitle">Tra cứu sự kiện, lọc danh mục và cập nhật tồn kho vé</p>
+          </div>
+        </div>
+        {hasLoaded && <span className="count-pill">{total} vé</span>}
+      </div>
 
       {/* Khối tìm kiếm và lọc vé */}
       <div className="filter-card" role="search" aria-label="Bộ lọc tìm kiếm vé">
@@ -639,10 +697,11 @@ function Tickets({ onTechInfo }) {
               Tìm theo tên sự kiện
             </label>
             <div className="input-wrap">
+              <IconSearch />
               <input
                 id="ts-search-input"
                 type="text"
-                className="field-input input-with-action"
+                className="field-input input-with-leading input-with-action"
                 placeholder="Ví dụ: Su kien mau"
                 maxLength={100}
                 value={searchInput}
@@ -857,7 +916,7 @@ function Tickets({ onTechInfo }) {
             disabled={page <= 1 || showLoading}
             onClick={() => setPage(p => Math.max(1, p - 1))}
           >
-            Trước
+            ← Trước
           </button>
           <span className="page-indicator">
             Trang {page}/{displayTotalPages}
@@ -868,13 +927,13 @@ function Tickets({ onTechInfo }) {
             disabled={page >= displayTotalPages || showLoading}
             onClick={() => setPage(p => Math.min(displayTotalPages, p + 1))}
           >
-            Sau
+            Sau →
           </button>
         </nav>
       )}
 
       {/* Biểu mẫu thêm vé mới */}
-      <form className="create-form" onSubmit={handleCreateTicket} noValidate aria-label="Thêm vé mới">
+      <form className="create-form form-surface" onSubmit={handleCreateTicket} noValidate aria-label="Thêm vé mới">
         <h3 className="form-heading">Thêm vé mới</h3>
         <div className="create-grid">
           <div className="field">
@@ -961,9 +1020,11 @@ function Tickets({ onTechInfo }) {
           </div>
         </div>
 
-        <button type="submit" className="btn-primary" disabled={creating}>
-          {creating ? 'Đang gửi...' : 'Thêm vé'}
-        </button>
+        <div className="form-submit-row">
+          <button type="submit" className="btn-primary" disabled={creating}>
+            {creating ? 'Đang gửi...' : '+ Thêm vé'}
+          </button>
+        </div>
 
         {createStatus.type === 'success' && (
           <p className="feedback feedback-success" role="status" aria-live="polite">
@@ -1045,7 +1106,9 @@ function LoadBalancer() {
             {Object.entries(counts).map(([k, v]) => (
               <div key={k} className="bar">
                 <span>{k}</span>
-                <i style={{ width: `${(v / total) * 100}%` }} />
+                <div className="bar-track">
+                  <i style={{ width: `${(v / total) * 100}%` }} />
+                </div>
                 <b>{v}</b>
               </div>
             ))}
@@ -1086,8 +1149,20 @@ export default function App() {
 
   return (
     <main>
-      <header className="page-header">
-        <h1>Hệ thống quản lý vé sự kiện</h1>
+      <header className="hero-header">
+        <div className="hero-top">
+          <div className="hero-brand">
+            <span className="hero-logo"><IconTicket /></span>
+            <div>
+              <span className="hero-eyebrow">Cổng quản trị bán vé</span>
+              <h1>Hệ thống quản lý vé sự kiện</h1>
+              <p className="hero-subtitle">
+                Tra cứu vé theo tên sự kiện, phân loại danh mục và quản lý người dùng tập trung.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <details className="quick-guide">
           <summary className="quick-guide-summary">Hướng dẫn nhanh</summary>
           <ul className="quick-guide-list">
@@ -1108,30 +1183,34 @@ export default function App() {
           <summary className="tech-summary">Thông tin kỹ thuật (dành cho demo)</summary>
           <div className="tech-content">
             <div className="tech-telemetry">
-              <p className="meta">
-                <b>Truy vấn vé gần nhất (/api/tickets):</b>{' '}
-                {techState.tickets ? (
-                  <>
-                    Nguồn dữ liệu: <b>{formatCacheSource(techState.tickets.cache)}</b> · Thời gian:{' '}
-                    <b>{techState.tickets.ms} ms</b> · Bản sao xử lý: <b>{techState.tickets.servedBy}</b> · Upstream:{' '}
-                    <b>{techState.tickets.upstream}</b>
-                  </>
-                ) : (
-                  'Chưa có dữ liệu'
-                )}
-              </p>
-              <p className="meta">
-                <b>Truy vấn người dùng gần nhất (/api/users):</b>{' '}
-                {techState.users ? (
-                  <>
-                    Nguồn dữ liệu: <b>Cơ sở dữ liệu (PostgreSQL)</b> · Thời gian:{' '}
-                    <b>{techState.users.ms} ms</b> · Bản sao xử lý: <b>{techState.users.servedBy}</b> · Upstream:{' '}
-                    <b>{techState.users.upstream}</b>
-                  </>
-                ) : (
-                  'Chưa có dữ liệu'
-                )}
-              </p>
+              <div className="tech-metric-card">
+                <p className="meta">
+                  <b>Truy vấn vé gần nhất (/api/tickets):</b>{' '}
+                  {techState.tickets ? (
+                    <>
+                      Nguồn dữ liệu: <b>{formatCacheSource(techState.tickets.cache)}</b> · Thời gian:{' '}
+                      <b>{techState.tickets.ms} ms</b> · Bản sao xử lý: <b>{techState.tickets.servedBy}</b> · Upstream:{' '}
+                      <b>{techState.tickets.upstream}</b>
+                    </>
+                  ) : (
+                    'Chưa có dữ liệu'
+                  )}
+                </p>
+              </div>
+              <div className="tech-metric-card">
+                <p className="meta">
+                  <b>Truy vấn người dùng gần nhất (/api/users):</b>{' '}
+                  {techState.users ? (
+                    <>
+                      Nguồn dữ liệu: <b>Cơ sở dữ liệu (PostgreSQL)</b> · Thời gian:{' '}
+                      <b>{techState.users.ms} ms</b> · Bản sao xử lý: <b>{techState.users.servedBy}</b> · Upstream:{' '}
+                      <b>{techState.users.upstream}</b>
+                    </>
+                  ) : (
+                    'Chưa có dữ liệu'
+                  )}
+                </p>
+              </div>
             </div>
             <LoadBalancer />
           </div>
