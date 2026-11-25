@@ -281,6 +281,37 @@ class TestTicketSearch(unittest.TestCase):
             self.assertEqual(by_event["Su kien mau B"]["category"], "Hoi thao")
             self.assertEqual(by_event["Su kien mau C"]["category"], "Am nhac")
 
+    def test_users_crud_if_available(self):
+        try:
+            s_health, _, _ = http_json("GET", "/api/users/health", timeout=3)
+        except Exception:
+            self.skipTest("User service không chạy trong môi trường test độc lập")
+        if s_health != 200:
+            self.skipTest("User service không khả dụng trên gateway hiện tại")
+
+        uid_tag = int(time.time() * 1000)
+        s_create, b_create, _ = http_json(
+            "POST",
+            "/api/users",
+            payload={"name": f"User {uid_tag}", "email": f"u{uid_tag}@example.com"},
+        )
+        self.assertEqual(s_create, 201)
+        uid = b_create["user"]["id"]
+
+        s_upd, b_upd, _ = http_json(
+            "PUT",
+            f"/api/users/{uid}",
+            payload={"name": f"Updated {uid_tag}", "email": f"upd{uid_tag}@example.com"},
+        )
+        self.assertEqual(s_upd, 200)
+        self.assertEqual(b_upd["user"]["name"], f"Updated {uid_tag}")
+
+        s_del, _, _ = http_json("DELETE", f"/api/users/{uid}")
+        self.assertEqual(s_del, 200)
+
+        s_get, _, _ = http_json("GET", f"/api/users/{uid}")
+        self.assertEqual(s_get, 404)
+
 
 class TestFrontendUXStatic(unittest.TestCase):
     """Kiểm tra tự động các tiêu chí UX / WCAG có thể xác minh tĩnh trên mã nguồn Frontend."""

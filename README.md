@@ -90,8 +90,8 @@ docker compose exec -T postgres psql -U postgres -d tickets_db -c \
 ## API
 | Phương thức | Đường dẫn | Mô tả |
 |---|---|---|
-| GET / POST | `/api/users` | Danh sách / tạo người dùng |
-| GET | `/api/users/{id}` | Chi tiết người dùng |
+| GET / POST | `/api/users` | Danh sách / thêm người dùng |
+| GET / PUT / DELETE | `/api/users/{id}` | Chi tiết / cập nhật / xoá người dùng |
 | GET | `/api/tickets` | Danh sách vé (cache Redis 30 s khi không truyền tham số); hỗ trợ lọc/phân trang `?q=&category=&page=&page_size=` (đọc trực tiếp PostgreSQL) |
 | POST | `/api/tickets` | Tạo vé mới (nhận `category` tuỳ chọn, mặc định `'Khac'`; tự xoá cache) |
 | GET | `/api/tickets/categories` | Tìm danh sách danh mục phân biệt `?q=&limit=` (mặc định 20, tối đa 50) |
