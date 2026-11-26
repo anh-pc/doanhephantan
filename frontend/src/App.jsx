@@ -78,87 +78,93 @@ function getInitial(name) {
   return s ? s[0].toUpperCase() : 'U';
 }
 
-/* ===== SECTION 02: HERO — Bản đồ Kiến trúc Sống ===== */
-function HeroSection({ activeDataNode, onJumpSearch, onJumpDemo }) {
+/* ===== Biểu tượng SVG nội tuyến sắc nét (0 KB mạng ngoài) ===== */
+function IconTicket() {
+  return (
+    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13 6v2m0 4v2" />
+    </svg>
+  );
+}
+
+function IconUsers() {
+  return (
+    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function IconActivity() {
+  return (
+    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M22 12h-4l-3 9L9 3l-3 9H2" />
+    </svg>
+  );
+}
+
+/* ===== Sơ đồ luồng Kiến trúc Sống (dùng trong trang Kiểm chứng phân tán) ===== */
+function ArchitectureBanner({ activeDataNode }) {
   const isRedisActive = activeDataNode === 'HIT';
   const isPgActive = activeDataNode === 'MISS' || activeDataNode === 'BYPASS';
 
   return (
-    <section className="hero-section" aria-labelledby="hero-title">
-      <div className="hero-copy">
-        <p className="hero-kicker">Kiến trúc Microservices · Docker Compose</p>
-        <h1 id="hero-title">
-          Quản lý vé sự kiện trên kiến trúc Microservices có cân bằng tải &amp; bộ nhớ đệm
-        </h1>
-        <p className="hero-desc">
-          Mọi yêu cầu đi qua cổng Nginx API Gateway (:8080), chia tải tròn xoay sang cụm Ticket Service
-          phi trạng thái, lưu trữ tách biệt trên PostgreSQL và tăng tốc đọc bằng Redis.
-        </p>
-        <div className="hero-cta-group">
-          <button type="button" className="btn-primary" onClick={onJumpSearch}>
-            Tìm &amp; thêm vé
-          </button>
-          <a href="#kiem-chung-phan-tan" className="btn-secondary link-btn" onClick={onJumpDemo}>
-            Gửi 30 request kiểm thử ↓
-          </a>
-        </div>
+    <div
+      className="arch-diagram"
+      role="img"
+      aria-label="Sơ đồ luồng yêu cầu: Trình duyệt qua Nginx Gateway cổng 8080 tới User Service và cụm Ticket Service, kết nối PostgreSQL và bộ nhớ đệm Redis"
+    >
+      <div className="arch-caption">
+        <span>Luồng kiến trúc hệ thống đang vận hành</span>
+        {activeDataNode && (
+          <span className={`arch-live-pill ${isRedisActive ? 'is-redis' : 'is-pg'}`}>
+            {isRedisActive ? '⚡ Phản hồi gần nhất: Redis HIT' : '🗄 Phản hồi gần nhất: PostgreSQL'}
+          </span>
+        )}
       </div>
 
-      {/* Sơ đồ luồng kiến trúc nội tuyến — tô sáng nút dữ liệu vừa phản hồi */}
-      <div
-        className="arch-diagram"
-        role="img"
-        aria-label="Sơ đồ luồng yêu cầu: Trình duyệt qua Nginx Gateway cổng 8080 tới User Service và cụm Ticket Service, kết nối PostgreSQL và bộ nhớ đệm Redis"
-      >
-        <div className="arch-caption">
-          <span>Sơ đồ luồng kiến trúc trực tiếp</span>
-          {activeDataNode && (
-            <span className={`arch-live-pill ${isRedisActive ? 'is-redis' : 'is-pg'}`}>
-              {isRedisActive ? '⚡ Vừa đọc: Redis HIT' : '🗄 Vừa đọc: PostgreSQL'}
-            </span>
-          )}
+      <div className="arch-flow">
+        <div className="arch-node arch-gateway">
+          <span className="arch-node-role">Cổng vào duy nhất</span>
+          <strong>Nginx Gateway :8080</strong>
+          <span className="arch-node-sub">Round-Robin · Failover</span>
         </div>
 
-        <div className="arch-flow">
-          <div className="arch-node arch-gateway">
-            <span className="arch-node-role">Cổng vào duy nhất</span>
-            <strong>Nginx Gateway :8080</strong>
-            <span className="arch-node-sub">Round-Robin · Failover</span>
+        <div className="arch-arrow" aria-hidden="true">→</div>
+
+        <div className="arch-stack">
+          <div className="arch-node arch-service">
+            <strong>Ticket Service ×N</strong>
+            <span className="arch-node-sub">Flask · Stateless</span>
           </div>
-
-          <div className="arch-arrow" aria-hidden="true">→</div>
-
-          <div className="arch-stack">
-            <div className="arch-node arch-service">
-              <strong>Ticket Service ×N</strong>
-              <span className="arch-node-sub">Flask · Stateless</span>
-            </div>
-            <div className="arch-node arch-service">
-              <strong>User Service</strong>
-              <span className="arch-node-sub">Node.js · Express</span>
-            </div>
+          <div className="arch-node arch-service">
+            <strong>User Service</strong>
+            <span className="arch-node-sub">Node.js · Express</span>
           </div>
+        </div>
 
-          <div className="arch-arrow" aria-hidden="true">→</div>
+        <div className="arch-arrow" aria-hidden="true">→</div>
 
-          <div className="arch-stack">
-            <div className={`arch-node arch-data${isRedisActive ? ' is-lit-redis' : ''}`}>
-              <strong>Redis Cache</strong>
-              <span className="arch-node-sub">Cache-aside · TTL 30–60s</span>
-            </div>
-            <div className={`arch-node arch-data${isPgActive ? ' is-lit-pg' : ''}`}>
-              <strong>PostgreSQL ×2 DB</strong>
-              <span className="arch-node-sub">tickets_db · users_db</span>
-            </div>
+        <div className="arch-stack">
+          <div className={`arch-node arch-data${isRedisActive ? ' is-lit-redis' : ''}`}>
+            <strong>Redis Cache</strong>
+            <span className="arch-node-sub">Cache-aside · TTL 30–60s</span>
+          </div>
+          <div className={`arch-node arch-data${isPgActive ? ' is-lit-pg' : ''}`}>
+            <strong>PostgreSQL ×2 DB</strong>
+            <span className="arch-node-sub">tickets_db · users_db</span>
           </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 
-/* ===== SECTION 04: QUẢN LÝ VÉ (Trọng tâm nghiệp vụ) ===== */
-function Tickets({ searchInputRef, onTechInfo }) {
+/* ===== TRANG 1: QUẢN LÝ VÉ ===== */
+function Tickets({ searchInputRef, onTechInfo, onCountChange, onOpenLab }) {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -222,7 +228,6 @@ function Tickets({ searchInputRef, onTechInfo }) {
     return () => document.removeEventListener('mousedown', onDocMouseDown);
   }, [catOpen, selectedCategory]);
 
-  // Tải danh sách vé (không truyền page khi ở trang 1 và không lọc nếu muốn giữ nhưng ở đây phân trang ổn định 10 vé/trang)
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
@@ -260,6 +265,7 @@ function Tickets({ searchInputRef, onTechInfo }) {
       }
       setError('');
       setHasLoaded(true);
+      onCountChange?.(nextTotal);
 
       onTechInfo?.({
         service: 'tickets',
@@ -276,9 +282,8 @@ function Tickets({ searchInputRef, onTechInfo }) {
       controller.abort();
       clearTimeout(loadingTimer);
     };
-  }, [appliedQuery, selectedCategory, page, reloadNonce, hasLoaded, onTechInfo]);
+  }, [appliedQuery, selectedCategory, page, reloadNonce, hasLoaded, onTechInfo, onCountChange]);
 
-  // Tìm danh mục phía server
   useEffect(() => {
     if (!catOpen) return undefined;
     const controller = new AbortController();
@@ -514,11 +519,14 @@ function Tickets({ searchInputRef, onTechInfo }) {
   const displayTotalPages = Math.max(totalPages, 1);
 
   return (
-    <section id="quan-ly-ve" className="section-block" aria-labelledby="tickets-heading">
-      <div className="section-header">
-        <div>
-          <span className="section-tag tag-ops">Nghiệp vụ trọng tâm</span>
+    <section className="view-panel" aria-labelledby="tickets-heading">
+      {/* Dải giới thiệu ngắn 5 giây ngay đầu trang vé */}
+      <div className="intro-strip">
+        <div className="intro-strip-text">
           <h2 id="tickets-heading">Quản lý vé</h2>
+          <p>
+            Tra cứu vé sự kiện, lọc theo danh mục và mở bán vé mới trên cụm Ticket Service phi trạng thái.
+          </p>
         </div>
         <div className="summary-inline" aria-live="polite" aria-atomic="true">
           <span className="count-badge">Tìm thấy {total} vé</span>
@@ -528,11 +536,14 @@ function Tickets({ searchInputRef, onTechInfo }) {
           {total > 0 && (
             <span className="page-meta">Trang {page}/{displayTotalPages}</span>
           )}
+          <button type="button" className="btn-secondary btn-compact" onClick={onOpenLab}>
+            Kiểm thử 30 request →
+          </button>
         </div>
       </div>
 
       <div className="workbench-grid">
-        {/* Cột trái (65%): Bộ lọc + Danh sách cuống vé + Phân trang */}
+        {/* Cột trái: Bộ lọc + Danh sách cuống vé + Phân trang */}
         <div className="card card-ops">
           <div className="filter-toolbar" role="search" aria-label="Bộ lọc tìm kiếm vé">
             <div className="filter-toolbar-grid">
@@ -762,7 +773,7 @@ function Tickets({ searchInputRef, onTechInfo }) {
           )}
         </div>
 
-        {/* Cột phải (35%): Biểu mẫu Thêm vé mới */}
+        {/* Cột phải: Biểu mẫu Thêm vé mới */}
         <aside className="card card-form">
           <form className="create-form" onSubmit={handleCreateTicket} noValidate aria-label="Thêm vé mới">
             <h3 className="form-heading">Thêm vé mới</h3>
@@ -877,8 +888,8 @@ function Tickets({ searchInputRef, onTechInfo }) {
   );
 }
 
-/* ===== SECTION 05: QUẢN LÝ NGƯỜI DÙNG (Database-per-Service: users_db) ===== */
-function Users({ onTechInfo }) {
+/* ===== TRANG 2: QUẢN LÝ NGƯỜI DÙNG ===== */
+function Users({ onTechInfo, onCountChange }) {
   const [items, setItems] = useState([]);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -914,6 +925,7 @@ function Users({ onTechInfo }) {
       setItems(nextItems);
       setLoadError('');
       setHasLoaded(true);
+      onCountChange?.(nextItems.length);
       onTechInfo?.({
         service: 'users',
         ok: true,
@@ -927,7 +939,7 @@ function Users({ onTechInfo }) {
       active = false;
       controller.abort();
     };
-  }, [reloadNonce, onTechInfo]);
+  }, [reloadNonce, onTechInfo, onCountChange]);
 
   const startEdit = (user) => {
     setEditingUser(user);
@@ -1032,11 +1044,13 @@ function Users({ onTechInfo }) {
   };
 
   return (
-    <section id="quan-ly-nguoi-dung" className="section-block" aria-labelledby="users-heading">
-      <div className="section-header">
-        <div>
-          <span className="section-tag tag-ops">Dịch vụ độc lập · users_db</span>
+    <section className="view-panel" aria-labelledby="users-heading">
+      <div className="intro-strip">
+        <div className="intro-strip-text">
           <h2 id="users-heading">Quản lý người dùng</h2>
+          <p>
+            Quản trị danh sách tài khoản trên dịch vụ User Service độc lập (cơ sở dữ liệu riêng users_db).
+          </p>
         </div>
         {hasLoaded && <span className="count-badge">{items.length} người dùng</span>}
       </div>
@@ -1238,7 +1252,7 @@ function Users({ onTechInfo }) {
   );
 }
 
-/* ===== SECTION 06: GIÁM SÁT CÂN BẰNG TẢI & 3 KỊCH BẢN KIỂM CHỨNG ===== */
+/* ===== COMPONENT GIÁM SÁT CÂN BẰNG TẢI & 3 KỊCH BẢN ===== */
 function LoadBalancer() {
   const [counts, setCounts] = useState({});
   const [prevRunSummary, setPrevRunSummary] = useState('');
@@ -1253,7 +1267,6 @@ function LoadBalancer() {
     setBusyWhoami(true);
     setLbError('');
 
-    // Lưu tóm tắt lần chạy trước để đối chiếu Trước / Sau khi dừng 1 bản sao
     const existingEntries = Object.entries(counts);
     if (existingEntries.length > 0) {
       const summary = `${existingEntries.length} bản sao (${existingEntries.map(([, v]) => v).join('/')})`;
@@ -1303,7 +1316,7 @@ function LoadBalancer() {
       <div className="lab-intro">
         <h3 id="lb-heading" className="lb-heading">Ba kịch bản kiểm chứng trực tiếp</h3>
         <p className="field-hint">
-          Thực hiện lần lượt 3 kịch bản dưới đây để quan sát cân bằng tải, bộ nhớ đệm Redis và khả năng chịu lỗi.
+          Bấm chạy trực tiếp từng kịch bản để quan sát cân bằng tải Round-Robin, bộ nhớ đệm Redis và chịu lỗi.
         </p>
       </div>
 
@@ -1314,12 +1327,12 @@ function LoadBalancer() {
       )}
 
       <div className="scenario-grid">
-        {/* Kịch bản 01: Cân bằng tải */}
+        {/* Kịch bản 01 */}
         <article className="scenario-card">
           <div className="scenario-step">Kịch bản 01 · Cân bằng tải</div>
           <h4 className="scenario-title">Phân phối 30 request Round-Robin</h4>
           <p className="field-hint">
-            Gửi liên tiếp 30 yêu cầu tới <code className="inline-code">/api/tickets/whoami</code>. Vạch đứng nét đứt là mốc lý tưởng 33,3% khi chạy 3 bản sao.
+            Gửi 30 yêu cầu tới <code className="inline-code">/api/tickets/whoami</code>. Vạch đứng là mốc lý tưởng 33,3% khi chạy 3 bản sao.
           </p>
           <button
             type="button"
@@ -1354,12 +1367,12 @@ function LoadBalancer() {
           </div>
         </article>
 
-        {/* Kịch bản 02: Bộ nhớ đệm Redis */}
+        {/* Kịch bản 02 */}
         <article className="scenario-card">
           <div className="scenario-step">Kịch bản 02 · Cache-aside</div>
           <h4 className="scenario-title">So sánh truy vấn nặng MISS rồi HIT</h4>
           <p className="field-hint">
-            Bấm lần 1 truy vấn cơ sở dữ liệu (mô phỏng trễ ~500 ms); bấm lần 2 trong vòng 60 giây lấy ngay từ Redis.
+            Bấm lần 1 truy vấn cơ sở dữ liệu (~500 ms); bấm lần 2 trong vòng 60 giây lấy ngay từ Redis.
           </p>
           <button
             type="button"
@@ -1384,25 +1397,25 @@ function LoadBalancer() {
               </p>
               {cacheHistory.missMs !== null && cacheHistory.hitMs !== null && (
                 <p className="speedup-note">
-                  Đối chiếu trực tiếp: MISS <b>{cacheHistory.missMs} ms</b> → HIT <b>{cacheHistory.hitMs} ms</b>
+                  Đối chiếu: MISS <b>{cacheHistory.missMs} ms</b> → HIT <b>{cacheHistory.hitMs} ms</b>
                 </p>
               )}
             </div>
           )}
         </article>
 
-        {/* Kịch bản 03: Chịu lỗi (chỉ hướng dẫn lệnh CLI, không có nút dừng container) */}
+        {/* Kịch bản 03 */}
         <article className="scenario-card">
           <div className="scenario-step">Kịch bản 03 · Chịu lỗi (HA)</div>
           <h4 className="scenario-title">Dừng 1 bản sao bằng dòng lệnh</h4>
           <p className="field-hint">
-            1. Chạy lệnh dưới đây trong Terminal để dừng đột ngột 1 container (nhấp vào ô lệnh để chọn nhanh):
+            1. Chạy lệnh dưới đây trong Terminal để dừng đột ngột 1 container (nhấp vào ô để chọn):
           </p>
           <code className="cli-box" tabIndex={0} aria-label="Lệnh dừng một bản sao ticket-service">
             ./scripts/kill-one.sh
           </code>
           <p className="field-hint">
-            2. Bấm lại nút <b>&ldquo;Gửi 30 request&rdquo;</b> ở Kịch bản 01: tải tự dồn sang các bản sao còn sống với <b>0 lỗi</b>.
+            2. Bấm lại <b>&ldquo;Gửi 30 request&rdquo;</b> ở Kịch bản 01: tải tự dồn sang bản sao còn sống với <b>0 lỗi</b>.
           </p>
           <p className="field-hint">
             3. Khôi phục lại đủ 3 bản sao:
@@ -1416,7 +1429,7 @@ function LoadBalancer() {
   );
 }
 
-/* ===== SECTION 07: BẰNG CHỨNG KỸ THUẬT (Chỉ dùng số đo thực nghiệm thật) ===== */
+/* ===== BẢNG BẰNG CHỨNG KỸ THUẬT (Số đo thực nghiệm thật) ===== */
 function TechnicalEvidenceSection() {
   const replicas = [
     { name: 'Bản sao 01', count: 99, pct: 33.0 },
@@ -1425,70 +1438,77 @@ function TechnicalEvidenceSection() {
   ];
 
   return (
-    <section className="section-block" aria-labelledby="evidence-heading">
-      <div className="section-header">
-        <div>
-          <span className="section-tag tag-tech">Số liệu thực nghiệm đã xác thực</span>
-          <h2 id="evidence-heading">Bằng chứng kỹ thuật trên môi trường Docker</h2>
-        </div>
+    <div className="card card-tech evidence-block">
+      <div className="pane-header-inline">
+        <h3 className="lb-heading">Bằng chứng kỹ thuật thực nghiệm (300 request)</h3>
+        <span className="section-tag tag-tech">Số đo thực tế của nhóm</span>
       </div>
 
-      <div className="card card-tech">
-        <dl className="evidence-metrics">
-          <div className="metric-tile">
-            <dt>Độ tin cậy (300 request)</dt>
-            <dd className="metric-number is-good">0 lỗi</dd>
-            <span className="metric-sub">Chia đều 99 / 99 / 102 qua 3 bản sao</span>
-          </div>
-
-          <div className="metric-tile">
-            <dt>Độ trễ vận hành bình thường</dt>
-            <dd className="metric-number">p95: 2,2 ms</dd>
-            <span className="metric-sub">Độ trễ tối đa: 11,7 ms</span>
-          </div>
-
-          <div className="metric-tile">
-            <dt>Khi dừng đột ngột 1 bản sao</dt>
-            <dd className="metric-number is-warn">≈ 1006 ms</dd>
-            <span className="metric-sub">Độ trễ tối đa lúc Nginx chờ 1s chuyển tiếp</span>
-          </div>
-
-          <div className="metric-tile metric-unmeasured">
-            <dt>Độ trễ bộ nhớ đệm Redis</dt>
-            <dd className="metric-placeholder">Chưa đo</dd>
-            <span className="metric-sub">Đo trực tiếp tại Kịch bản 02 phía trên</span>
-          </div>
-        </dl>
-
-        <div className="evidence-bars" role="group" aria-label="Phân phối thực nghiệm 300 request trên 3 bản sao">
-          <p className="evidence-bars-title">
-            Phân phối thực tế 300 request qua Nginx Round-Robin:
-          </p>
-          {replicas.map(r => (
-            <div key={r.name} className="bar">
-              <span className="mono-label">{r.name}</span>
-              <div className="bar-track bar-track-ideal">
-                <i style={{ width: `${r.pct}%` }} />
-              </div>
-              <b className="mono-num">{r.count} req ({r.pct.toFixed(1).replace('.', ',')}%)</b>
-            </div>
-          ))}
+      <dl className="evidence-metrics">
+        <div className="metric-tile">
+          <dt>Độ tin cậy (300 request)</dt>
+          <dd className="metric-number is-good">0 lỗi</dd>
+          <span className="metric-sub">Chia đều 99 / 99 / 102 qua 3 bản sao</span>
         </div>
 
-        <p className="evidence-source">
-          Nguồn số đo: Đo kiểm thực tế của nhóm bằng <code className="inline-code">scripts/lb_test.py --n 300</code> qua cổng Gateway <code className="inline-code">:8080</code> trên Docker Compose cục bộ (<code className="inline-code">--scale ticket-service=3</code>).
+        <div className="metric-tile">
+          <dt>Độ trễ vận hành bình thường</dt>
+          <dd className="metric-number">p95: 2,2 ms</dd>
+          <span className="metric-sub">Độ trễ tối đa: 11,7 ms</span>
+        </div>
+
+        <div className="metric-tile">
+          <dt>Khi dừng đột ngột 1 bản sao</dt>
+          <dd className="metric-number is-warn">≈ 1006 ms</dd>
+          <span className="metric-sub">Độ trễ tối đa lúc Nginx chờ 1s chuyển tiếp</span>
+        </div>
+
+        <div className="metric-tile metric-unmeasured">
+          <dt>Độ trễ bộ nhớ đệm Redis</dt>
+          <dd className="metric-placeholder">Chưa đo</dd>
+          <span className="metric-sub">Đo trực tiếp tại Kịch bản 02 phía trên</span>
+        </div>
+      </dl>
+
+      <div className="evidence-bars" role="group" aria-label="Phân phối thực nghiệm 300 request trên 3 bản sao">
+        <p className="evidence-bars-title">
+          Phân phối thực tế 300 request qua Nginx Round-Robin:
         </p>
+        {replicas.map(r => (
+          <div key={r.name} className="bar">
+            <span className="mono-label">{r.name}</span>
+            <div className="bar-track bar-track-ideal">
+              <i style={{ width: `${r.pct}%` }} />
+            </div>
+            <b className="mono-num">{r.count} req ({r.pct.toFixed(1).replace('.', ',')}%)</b>
+          </div>
+        ))}
       </div>
-    </section>
+
+      <p className="evidence-source">
+        Nguồn số đo: Đo kiểm thực tế bằng <code className="inline-code">scripts/lb_test.py --n 300</code> qua cổng Gateway <code className="inline-code">:8080</code> trên Docker Compose cục bộ (<code className="inline-code">--scale ticket-service=3</code>).
+      </p>
+    </div>
   );
 }
 
+/* ===== KHUNG ỨNG DỤNG CHÍNH: THANH ĐIỀU HƯỚNG 3 PHÂN HỆ NHƯ WEB THẬT ===== */
 export default function App() {
+  const [activeView, setActiveView] = useState('tickets'); // 'tickets' | 'users' | 'lab'
+  const [counts, setCounts] = useState({ tickets: null, users: null });
   const [techState, setTechState] = useState({ tickets: null, users: null });
   const searchInputRef = useRef(null);
 
   const handleTechInfo = useRef((info) => {
     setTechState(prev => ({ ...prev, [info.service]: info }));
+  }).current;
+
+  const handleTicketCount = useRef((n) => {
+    setCounts(prev => ({ ...prev, tickets: n }));
+  }).current;
+
+  const handleUserCount = useRef((n) => {
+    setCounts(prev => ({ ...prev, users: n }));
   }).current;
 
   const gatewayStatus =
@@ -1498,25 +1518,86 @@ export default function App() {
         ? 'offline'
         : 'checking';
 
-  const jumpToSearch = () => {
-    searchInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    searchInputRef.current?.focus();
+  const switchView = (viewName) => {
+    setActiveView(viewName);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleTabKeyDown = (e, currentIdx) => {
+    const order = ['tickets', 'users', 'lab'];
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const next = order[(currentIdx + 1) % order.length];
+      setActiveView(next);
+      document.getElementById(`nav-tab-${next}`)?.focus();
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const prev = order[(currentIdx - 1 + order.length) % order.length];
+      setActiveView(prev);
+      document.getElementById(`nav-tab-${prev}`)?.focus();
+    }
   };
 
   return (
     <>
-      {/* SECTION 01: HEADER */}
-      <header className="site-header">
-        <div className="site-header-inner">
-          <div className="brand-block">
-            <span className="brand-dot" aria-hidden="true" />
-            <span className="brand-title">Đồ án Hệ phân tán · Quản trị vé Microservices</span>
+      {/* HEADER ỨNG DỤNG VỚI THANH CHUYỂN TAB HIỆN ĐẠI (Bấm chuyển trang tức thì, không còn gạch chân xấu) */}
+      <header className="app-topbar">
+        <div className="app-topbar-inner">
+          <div className="app-brand">
+            <span className="app-brand-mark"><IconTicket /></span>
+            <div>
+              <h1 className="app-brand-title">Hệ thống Quản lý Vé Sự kiện</h1>
+              <span className="app-brand-sub">Kiến trúc Microservices · Cân bằng tải &amp; Redis Cache</span>
+            </div>
           </div>
 
-          <nav className="header-nav" aria-label="Điều hướng nhanh trong trang">
-            <a href="#quan-ly-ve">Quản lý vé</a>
-            <a href="#quan-ly-nguoi-dung">Người dùng</a>
-            <a href="#kiem-chung-phan-tan">Kiểm chứng phân tán</a>
+          <nav className="app-nav-tabs" role="tablist" aria-label="Chuyển trang chức năng">
+            <button
+              id="nav-tab-tickets"
+              type="button"
+              role="tab"
+              aria-selected={activeView === 'tickets'}
+              aria-controls="panel-tickets"
+              tabIndex={activeView === 'tickets' ? 0 : -1}
+              className={`nav-tab-btn${activeView === 'tickets' ? ' is-active' : ''}`}
+              onClick={() => switchView('tickets')}
+              onKeyDown={e => handleTabKeyDown(e, 0)}
+            >
+              <IconTicket />
+              <span>Quản lý vé</span>
+              {counts.tickets !== null && <span className="nav-tab-badge">{counts.tickets}</span>}
+            </button>
+
+            <button
+              id="nav-tab-users"
+              type="button"
+              role="tab"
+              aria-selected={activeView === 'users'}
+              aria-controls="panel-users"
+              tabIndex={activeView === 'users' ? 0 : -1}
+              className={`nav-tab-btn${activeView === 'users' ? ' is-active' : ''}`}
+              onClick={() => switchView('users')}
+              onKeyDown={e => handleTabKeyDown(e, 1)}
+            >
+              <IconUsers />
+              <span>Người dùng</span>
+              {counts.users !== null && <span className="nav-tab-badge">{counts.users}</span>}
+            </button>
+
+            <button
+              id="nav-tab-lab"
+              type="button"
+              role="tab"
+              aria-selected={activeView === 'lab'}
+              aria-controls="panel-lab"
+              tabIndex={activeView === 'lab' ? 0 : -1}
+              className={`nav-tab-btn${activeView === 'lab' ? ' is-active' : ''}`}
+              onClick={() => switchView('lab')}
+              onKeyDown={e => handleTabKeyDown(e, 2)}
+            >
+              <IconActivity />
+              <span>Kiểm chứng phân tán</span>
+            </button>
           </nav>
 
           <div className="gateway-status" aria-live="polite">
@@ -1527,98 +1608,123 @@ export default function App() {
               <span className="status-pill is-offline">▲ Mất kết nối Gateway</span>
             )}
             {gatewayStatus === 'checking' && (
-              <span className="status-pill">◌ Đang kiểm tra Gateway...</span>
+              <span className="status-pill">◌ Đang kết nối...</span>
             )}
           </div>
         </div>
       </header>
 
       <main>
-        {/* SECTION 02: HERO */}
-        <HeroSection
-          activeDataNode={techState.tickets?.cache}
-          onJumpSearch={jumpToSearch}
-        />
-
-        {/* SECTION 03: HƯỚNG DẪN NHANH (Thu gọn mặc định) */}
+        {/* Hướng dẫn nhanh thu gọn mặc định */}
         <details className="quick-guide">
-          <summary className="quick-guide-summary">Hướng dẫn nhanh (4 bước thao tác &amp; bảo vệ)</summary>
+          <summary className="quick-guide-summary">Hướng dẫn nhanh</summary>
           <ul className="quick-guide-list">
-            <li>Gõ tên sự kiện hoặc mở ô Danh mục tại khu <b>Quản lý vé</b> để lọc tự động không cần bấm nút Tìm.</li>
-            <li>Điền biểu mẫu bên phải và nhấn phím <b>Enter</b> ở bất kỳ ô nào để thêm vé hoặc quản lý người dùng.</li>
-            <li>Cuộn xuống khu <b>Giám sát cân bằng tải</b> bấm &ldquo;Gửi 30 request&rdquo; để xem tỷ lệ chia tải thực tế và đối chiếu Trước/Sau sự cố.</li>
-            <li>Mở mục &ldquo;Thông tin kỹ thuật (dành cho demo)&rdquo; khi cần xem chi tiết bản sao xử lý và địa chỉ Upstream nội bộ.</li>
+            <li>Bấm các nút trên thanh điều hướng (<b>Quản lý vé</b>, <b>Người dùng</b>, <b>Kiểm chứng phân tán</b>) để chuyển màn hình làm việc ngay lập tức.</li>
+            <li>Trong <b>Quản lý vé</b>: gõ tên sự kiện hoặc chọn danh mục để lọc tự động; nhấn <b>Enter</b> trong biểu mẫu để thêm vé mới.</li>
+            <li>Trong <b>Người dùng</b>: hỗ trợ đầy đủ Thêm mới, Sửa trực tiếp và Xoá có xác nhận an toàn.</li>
+            <li>Trong <b>Kiểm chứng phân tán</b>: bấm &ldquo;Gửi 30 request&rdquo; để xem chia tải Round-Robin và kiểm tra bộ nhớ đệm Redis.</li>
           </ul>
         </details>
 
-        {/* SECTION 04: QUẢN LÝ VÉ */}
-        <Tickets searchInputRef={searchInputRef} onTechInfo={handleTechInfo} />
+        {/* MÀN HÌNH 1: QUẢN LÝ VÉ */}
+        <div
+          id="panel-tickets"
+          role="tabpanel"
+          aria-labelledby="nav-tab-tickets"
+          hidden={activeView !== 'tickets'}
+        >
+          <Tickets
+            searchInputRef={searchInputRef}
+            onTechInfo={handleTechInfo}
+            onCountChange={handleTicketCount}
+            onOpenLab={() => switchView('lab')}
+          />
+        </div>
 
-        {/* SECTION 05: QUẢN LÝ NGƯỜI DÙNG */}
-        <Users onTechInfo={handleTechInfo} />
+        {/* MÀN HÌNH 2: NGƯỜI DÙNG */}
+        <div
+          id="panel-users"
+          role="tabpanel"
+          aria-labelledby="nav-tab-users"
+          hidden={activeView !== 'users'}
+        >
+          <Users
+            onTechInfo={handleTechInfo}
+            onCountChange={handleUserCount}
+          />
+        </div>
 
-        {/* SECTION 06: GIÁM SÁT CÂN BẰNG TẢI & CACHE */}
-        <section id="kiem-chung-phan-tan" className="section-block" aria-labelledby="lab-section-heading">
-          <div className="section-header">
-            <div>
-              <span className="section-tag tag-tech">Kiểm chứng trực tiếp</span>
-              <h2 id="lab-section-heading">Giám sát cân bằng tải &amp; bộ nhớ đệm</h2>
+        {/* MÀN HÌNH 3: KIỂM CHỨNG PHÂN TÁN */}
+        <div
+          id="panel-lab"
+          role="tabpanel"
+          aria-labelledby="nav-tab-lab"
+          hidden={activeView !== 'lab'}
+        >
+          <section className="view-panel" aria-labelledby="lab-section-heading">
+            <div className="intro-strip">
+              <div className="intro-strip-text">
+                <h2 id="lab-section-heading">Giám sát cân bằng tải &amp; bộ nhớ đệm</h2>
+                <p>
+                  Bàn thí nghiệm trực tiếp kiểm chứng chia tải đa bản sao, Cache-aside Redis và khả năng chịu lỗi.
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="card card-tech">
-            <LoadBalancer />
+            <ArchitectureBanner activeDataNode={techState.tickets?.cache} />
 
-            {/* Khối chi tiết kỹ thuật ẩn mặc định cho người dùng thường (AC17, AC35, AC37) */}
-            <details className="tech-details">
-              <summary className="tech-summary">Thông tin kỹ thuật (dành cho demo)</summary>
-              <div className="tech-content">
-                <div className="tech-telemetry">
-                  <div className="tech-metric-card">
-                    <p className="meta">
-                      <b>Truy vấn vé gần nhất (/api/tickets):</b>{' '}
-                      {techState.tickets?.ok ? (
-                        <>
-                          Nguồn: <b>{formatCacheSource(techState.tickets.cache)}</b> · Thời gian:{' '}
-                          <b className="mono-num">{techState.tickets.ms} ms</b> · Bản sao:{' '}
-                          <b className="mono-label">{techState.tickets.servedBy}</b> · Upstream:{' '}
-                          <b className="mono-label">{techState.tickets.upstream}</b>
-                        </>
-                      ) : (
-                        'Chưa có dữ liệu'
-                      )}
-                    </p>
-                  </div>
-                  <div className="tech-metric-card">
-                    <p className="meta">
-                      <b>Truy vấn người dùng gần nhất (/api/users):</b>{' '}
-                      {techState.users?.ok ? (
-                        <>
-                          Nguồn: <b>Cơ sở dữ liệu (PostgreSQL)</b> · Thời gian:{' '}
-                          <b className="mono-num">{techState.users.ms} ms</b> · Bản sao:{' '}
-                          <b className="mono-label">{techState.users.servedBy}</b> · Upstream:{' '}
-                          <b className="mono-label">{techState.users.upstream}</b>
-                        </>
-                      ) : (
-                        'Chưa có dữ liệu'
-                      )}
-                    </p>
+            <div className="card card-tech lab-main-card">
+              <LoadBalancer />
+
+              {/* Chi tiết kỹ thuật thu gọn mặc định (AC17, AC35, AC37) */}
+              <details className="tech-details">
+                <summary className="tech-summary">Thông tin kỹ thuật (dành cho demo)</summary>
+                <div className="tech-content">
+                  <div className="tech-telemetry">
+                    <div className="tech-metric-card">
+                      <p className="meta">
+                        <b>Truy vấn vé gần nhất (/api/tickets):</b>{' '}
+                        {techState.tickets?.ok ? (
+                          <>
+                            Nguồn: <b>{formatCacheSource(techState.tickets.cache)}</b> · Thời gian:{' '}
+                            <b className="mono-num">{techState.tickets.ms} ms</b> · Bản sao:{' '}
+                            <b className="mono-label">{techState.tickets.servedBy}</b> · Upstream:{' '}
+                            <b className="mono-label">{techState.tickets.upstream}</b>
+                          </>
+                        ) : (
+                          'Chưa có dữ liệu'
+                        )}
+                      </p>
+                    </div>
+                    <div className="tech-metric-card">
+                      <p className="meta">
+                        <b>Truy vấn người dùng gần nhất (/api/users):</b>{' '}
+                        {techState.users?.ok ? (
+                          <>
+                            Nguồn: <b>Cơ sở dữ liệu (PostgreSQL)</b> · Thời gian:{' '}
+                            <b className="mono-num">{techState.users.ms} ms</b> · Bản sao:{' '}
+                            <b className="mono-label">{techState.users.servedBy}</b> · Upstream:{' '}
+                            <b className="mono-label">{techState.users.upstream}</b>
+                          </>
+                        ) : (
+                          'Chưa có dữ liệu'
+                        )}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </details>
-          </div>
-        </section>
+              </details>
+            </div>
 
-        {/* SECTION 07: BẰNG CHỨNG KỸ THUẬT */}
-        <TechnicalEvidenceSection />
+            <TechnicalEvidenceSection />
+          </section>
+        </div>
       </main>
 
-      {/* SECTION 08: FOOTER */}
       <footer className="site-footer">
         <div className="site-footer-inner">
           <div>
-            <strong>Đồ án môn Hệ phân tán</strong> · Kiến trúc Microservices với Nginx, Flask, Node.js, PostgreSQL &amp; Redis
+            <strong>Đồ án môn Hệ phân tán</strong> · Nginx API Gateway · Flask · Node.js · PostgreSQL · Redis
             <p className="support-note">Cần hỗ trợ? Liên hệ quản trị viên hệ thống.</p>
           </div>
           <div className="footer-links">
