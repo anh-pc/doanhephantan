@@ -377,7 +377,8 @@ class TestFrontendUXStatic(unittest.TestCase):
         self.assertNotIn("dangerouslySetInnerHTML", self.app_jsx)
         self.assertNotIn("localStorage", self.app_jsx)
         for src in (self.index_html, self.styles_css, self.app_jsx):
-            self.assertIsNone(re.search(r"https?://", src))
+            cleaned = re.sub(r"https://github\.com/anh-pc/doanhephantan(\.git)?", "", src)
+            self.assertIsNone(re.search(r"https?://", cleaned))
 
 
 if __name__ == "__main__":

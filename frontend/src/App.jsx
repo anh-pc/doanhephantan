@@ -6,7 +6,7 @@ const LOADING_DELAY_MS = 150;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SERVER_UNREACHABLE_MSG = 'Không kết nối được máy chủ. Vui lòng thử lại sau.';
 
-// Gọi API qua Gateway (/api/...), bắt toàn bộ lỗi mạng để không làm sập giao diện
+// Gọi API qua cổng Gateway tương đối (/api/...), bắt toàn bộ lỗi mạng an toàn
 async function api(path, options) {
   const t0 = performance.now();
   try {
@@ -78,367 +78,87 @@ function getInitial(name) {
   return s ? s[0].toUpperCase() : 'U';
 }
 
-function Users({ onTechInfo, onCountChange }) {
-  const [items, setItems] = useState([]);
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
-  const [reloadNonce, setReloadNonce] = useState(0);
-
-  // Thêm / Sửa / Xoá người dùng
-  const [editingUser, setEditingUser] = useState(null); // { id, name, email } | null
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
-
-  const [form, setForm] = useState({ name: '', email: '' });
-  const [submitting, setSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState({ type: '', text: '' });
-
-  const nameInputRef = useRef(null);
-  const emailInputRef = useRef(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    let active = true;
-    setLoading(true);
-
-    (async () => {
-      const r = await api('/api/users', { signal: controller.signal });
-      if (!active || r.aborted) return;
-      setLoading(false);
-      if (!r.ok) {
-        setLoadError(getFriendlyError(r, 'load-users'));
-        return;
-      }
-      const nextItems = Array.isArray(r.body.items) ? r.body.items : [];
-      setItems(nextItems);
-      setLoadError('');
-      setHasLoaded(true);
-      onCountChange?.(nextItems.length);
-      onTechInfo?.({
-        service: 'users',
-        ms: r.ms,
-        servedBy: r.body.served_by || '-',
-        upstream: r.upstream || '-',
-      });
-    })();
-
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [reloadNonce, onTechInfo, onCountChange]);
-
-  const startEdit = (user) => {
-    setEditingUser(user);
-    setConfirmDeleteId(null);
-    setForm({ name: user.name, email: user.email });
-    setFeedback({ type: '', text: '' });
-    setTimeout(() => nameInputRef.current?.focus(), 0);
-  };
-
-  const cancelEdit = () => {
-    setEditingUser(null);
-    setForm({ name: '', email: '' });
-    setFeedback({ type: '', text: '' });
-    nameInputRef.current?.focus();
-  };
-
-  const handleDelete = async (user) => {
-    if (deletingId) return;
-    setDeletingId(user.id);
-    setFeedback({ type: '', text: '' });
-
-    const r = await api(`/api/users/${user.id}`, { method: 'DELETE' });
-    setDeletingId(null);
-    setConfirmDeleteId(null);
-
-    if (r.ok) {
-      if (editingUser && editingUser.id === user.id) {
-        setEditingUser(null);
-        setForm({ name: '', email: '' });
-      }
-      setFeedback({ type: 'success', text: `Đã xoá người dùng '${user.name}'.` });
-      setReloadNonce(n => n + 1);
-    } else {
-      if (r.status === 404) {
-        setReloadNonce(n => n + 1);
-      }
-      setFeedback({ type: 'error', text: getFriendlyError(r, 'delete-user') });
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (submitting) return;
-
-    const trimmedName = form.name.trim();
-    const trimmedEmail = form.email.trim();
-
-    if (!trimmedName) {
-      setFeedback({ type: 'error', text: 'Vui lòng nhập họ và tên người dùng.' });
-      nameInputRef.current?.focus();
-      return;
-    }
-    if (trimmedName.length > 100) {
-      setFeedback({ type: 'error', text: 'Họ và tên không được vượt quá 100 ký tự.' });
-      nameInputRef.current?.focus();
-      return;
-    }
-    if (!trimmedEmail || !EMAIL_RE.test(trimmedEmail)) {
-      setFeedback({
-        type: 'error',
-        text: 'Địa chỉ email chưa đúng định dạng. Vui lòng nhập theo mẫu ten@mien.com.',
-      });
-      emailInputRef.current?.focus();
-      return;
-    }
-    if (trimmedEmail.length > 150) {
-      setFeedback({ type: 'error', text: 'Địa chỉ email không được vượt quá 150 ký tự.' });
-      emailInputRef.current?.focus();
-      return;
-    }
-
-    setSubmitting(true);
-    setFeedback({ type: '', text: '' });
-
-    const isEdit = Boolean(editingUser);
-    const url = isEdit ? `/api/users/${editingUser.id}` : '/api/users';
-    const method = isEdit ? 'PUT' : 'POST';
-
-    const r = await api(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: trimmedName, email: trimmedEmail }),
-    });
-    setSubmitting(false);
-
-    if (r.ok) {
-      setFeedback({
-        type: 'success',
-        text: isEdit
-          ? `Đã cập nhật người dùng '${trimmedName}'.`
-          : `Đã thêm người dùng '${trimmedName}'.`,
-      });
-      setEditingUser(null);
-      setForm({ name: '', email: '' });
-      setReloadNonce(n => n + 1);
-      nameInputRef.current?.focus();
-    } else {
-      if (r.status === 404) {
-        setEditingUser(null);
-        setReloadNonce(n => n + 1);
-      }
-      // Giữ nguyên dữ liệu đã nhập để sửa ngay (AC20, AC32)
-      setFeedback({ type: 'error', text: getFriendlyError(r, 'save-user') });
-    }
-  };
+/* ===== SECTION 02: HERO — Bản đồ Kiến trúc Sống ===== */
+function HeroSection({ activeDataNode, onJumpSearch, onJumpDemo }) {
+  const isRedisActive = activeDataNode === 'HIT';
+  const isPgActive = activeDataNode === 'MISS' || activeDataNode === 'BYPASS';
 
   return (
-    <section className="workspace-split" aria-labelledby="users-heading">
-      {/* Cột trái: Danh sách người dùng */}
-      <div className="card main-pane">
-        <div className="pane-header">
-          <h2 id="users-heading">Quản lý người dùng</h2>
-          {hasLoaded && <span className="count-badge">{items.length} người dùng</span>}
-        </div>
-
-        {loadError && (
-          <div className="state-box state-error" role="alert">
-            <p className="state-text">⚠ Lỗi: {loadError}</p>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => setReloadNonce(n => n + 1)}
-            >
-              Thử lại
-            </button>
-          </div>
-        )}
-
-        <div className="list-region user-list-region" aria-live="polite">
-          {loading && !hasLoaded && (
-            <div className="state-box state-loading" role="status">
-              <p className="state-text">Đang tải danh sách người dùng...</p>
-            </div>
-          )}
-
-          {!loading && !loadError && hasLoaded && items.length === 0 && (
-            <div className="state-box">
-              <p className="state-text">Chưa có người dùng nào trong hệ thống.</p>
-            </div>
-          )}
-
-          {items.length > 0 && (
-            <ul className="entity-list" aria-label="Danh sách người dùng">
-              {items.map(u => {
-                const isBeingEdited = editingUser?.id === u.id;
-                const isConfirmingDelete = confirmDeleteId === u.id;
-                return (
-                  <li
-                    key={u.id}
-                    className={`entity-item${isBeingEdited ? ' is-editing' : ''}`}
-                  >
-                    <div className="user-info">
-                      <span className="user-avatar" aria-hidden="true">{getInitial(u.name)}</span>
-                      <div className="user-text">
-                        <span className="entity-primary">{u.name}</span>
-                        <span className="entity-secondary">{u.email}</span>
-                      </div>
-                    </div>
-
-                    <div className="row-actions">
-                      {isConfirmingDelete ? (
-                        <div className="confirm-inline" role="group" aria-label={`Xác nhận xoá ${u.name}`}>
-                          <span className="confirm-label">Xoá?</span>
-                          <button
-                            type="button"
-                            className="btn-danger btn-compact"
-                            disabled={deletingId === u.id}
-                            onClick={() => handleDelete(u)}
-                          >
-                            {deletingId === u.id ? 'Đang xoá...' : 'Xác nhận'}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-secondary btn-compact"
-                            disabled={deletingId === u.id}
-                            onClick={() => setConfirmDeleteId(null)}
-                          >
-                            Huỷ
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            className="btn-secondary btn-compact"
-                            onClick={() => startEdit(u)}
-                            aria-label={`Sửa người dùng ${u.name}`}
-                          >
-                            Sửa
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-danger-outline btn-compact"
-                            onClick={() => setConfirmDeleteId(u.id)}
-                            aria-label={`Xoá người dùng ${u.name}`}
-                          >
-                            Xoá
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+    <section className="hero-section" aria-labelledby="hero-title">
+      <div className="hero-copy">
+        <p className="hero-kicker">Kiến trúc Microservices · Docker Compose</p>
+        <h1 id="hero-title">
+          Quản lý vé sự kiện trên kiến trúc Microservices có cân bằng tải &amp; bộ nhớ đệm
+        </h1>
+        <p className="hero-desc">
+          Mọi yêu cầu đi qua cổng Nginx API Gateway (:8080), chia tải tròn xoay sang cụm Ticket Service
+          phi trạng thái, lưu trữ tách biệt trên PostgreSQL và tăng tốc đọc bằng Redis.
+        </p>
+        <div className="hero-cta-group">
+          <button type="button" className="btn-primary" onClick={onJumpSearch}>
+            Tìm &amp; thêm vé
+          </button>
+          <a href="#kiem-chung-phan-tan" className="btn-secondary link-btn" onClick={onJumpDemo}>
+            Gửi 30 request kiểm thử ↓
+          </a>
         </div>
       </div>
 
-      {/* Cột phải: Biểu mẫu Thêm / Chỉnh sửa người dùng */}
-      <aside className="card side-pane">
-        <form
-          className="create-form"
-          onSubmit={handleSubmit}
-          noValidate
-          aria-label={editingUser ? 'Chỉnh sửa người dùng' : 'Thêm người dùng mới'}
-        >
-          <div className="pane-header">
-            <h3 className="form-heading">
-              {editingUser ? 'Chỉnh sửa người dùng' : 'Thêm người dùng mới'}
-            </h3>
-            {editingUser && (
-              <span className="edit-badge">Đang sửa #{editingUser.id}</span>
-            )}
+      {/* Sơ đồ luồng kiến trúc nội tuyến — tô sáng nút dữ liệu vừa phản hồi */}
+      <div
+        className="arch-diagram"
+        role="img"
+        aria-label="Sơ đồ luồng yêu cầu: Trình duyệt qua Nginx Gateway cổng 8080 tới User Service và cụm Ticket Service, kết nối PostgreSQL và bộ nhớ đệm Redis"
+      >
+        <div className="arch-caption">
+          <span>Sơ đồ luồng kiến trúc trực tiếp</span>
+          {activeDataNode && (
+            <span className={`arch-live-pill ${isRedisActive ? 'is-redis' : 'is-pg'}`}>
+              {isRedisActive ? '⚡ Vừa đọc: Redis HIT' : '🗄 Vừa đọc: PostgreSQL'}
+            </span>
+          )}
+        </div>
+
+        <div className="arch-flow">
+          <div className="arch-node arch-gateway">
+            <span className="arch-node-role">Cổng vào duy nhất</span>
+            <strong>Nginx Gateway :8080</strong>
+            <span className="arch-node-sub">Round-Robin · Failover</span>
           </div>
 
-          <div className="form-stack">
-            <div className="field">
-              <label className="field-label" htmlFor="user-name-input">
-                Họ và tên <span aria-hidden="true">*</span>
-              </label>
-              <input
-                ref={nameInputRef}
-                id="user-name-input"
-                type="text"
-                className="field-input"
-                placeholder="Ví dụ: Nguyễn Văn An"
-                maxLength={100}
-                value={form.name}
-                onChange={e => setForm({ ...form, name: e.target.value })}
-                aria-describedby="user-name-hint"
-                required
-              />
-              <p id="user-name-hint" className="field-hint">
-                Tối đa 100 ký tự, ví dụ Nguyễn Văn An.
-              </p>
-            </div>
+          <div className="arch-arrow" aria-hidden="true">→</div>
 
-            <div className="field">
-              <label className="field-label" htmlFor="user-email-input">
-                Địa chỉ email <span aria-hidden="true">*</span>
-              </label>
-              <input
-                ref={emailInputRef}
-                id="user-email-input"
-                type="email"
-                className="field-input"
-                placeholder="Ví dụ: an.nguyen@example.com"
-                maxLength={150}
-                value={form.email}
-                onChange={e => setForm({ ...form, email: e.target.value })}
-                aria-describedby="user-email-hint"
-                required
-              />
-              <p id="user-email-hint" className="field-hint">
-                Định dạng ten@mien.com (tối đa 150 ký tự).
-              </p>
+          <div className="arch-stack">
+            <div className="arch-node arch-service">
+              <strong>Ticket Service ×N</strong>
+              <span className="arch-node-sub">Flask · Stateless</span>
+            </div>
+            <div className="arch-node arch-service">
+              <strong>User Service</strong>
+              <span className="arch-node-sub">Node.js · Express</span>
             </div>
           </div>
 
-          <div className="form-actions">
-            <button type="submit" className="btn-primary" disabled={submitting}>
-              {submitting
-                ? 'Đang gửi...'
-                : editingUser
-                  ? 'Lưu thay đổi'
-                  : 'Thêm người dùng'}
-            </button>
-            {editingUser && (
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={submitting}
-                onClick={cancelEdit}
-              >
-                Huỷ
-              </button>
-            )}
+          <div className="arch-arrow" aria-hidden="true">→</div>
+
+          <div className="arch-stack">
+            <div className={`arch-node arch-data${isRedisActive ? ' is-lit-redis' : ''}`}>
+              <strong>Redis Cache</strong>
+              <span className="arch-node-sub">Cache-aside · TTL 30–60s</span>
+            </div>
+            <div className={`arch-node arch-data${isPgActive ? ' is-lit-pg' : ''}`}>
+              <strong>PostgreSQL ×2 DB</strong>
+              <span className="arch-node-sub">tickets_db · users_db</span>
+            </div>
           </div>
-
-          {feedback.type === 'success' && (
-            <p className="feedback feedback-success" role="status" aria-live="polite">
-              ✓ Thành công: {feedback.text}
-            </p>
-          )}
-          {feedback.type === 'error' && (
-            <p className="feedback feedback-error" role="alert">
-              ⚠ Lỗi: {feedback.text}
-            </p>
-          )}
-
-          <p className="privacy-note">
-            Thông tin chỉ dùng để quản lý vé trong hệ thống này.
-          </p>
-        </form>
-      </aside>
+        </div>
+      </div>
     </section>
   );
 }
 
-function Tickets({ onTechInfo, onCountChange }) {
+/* ===== SECTION 04: QUẢN LÝ VÉ (Trọng tâm nghiệp vụ) ===== */
+function Tickets({ searchInputRef, onTechInfo }) {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -488,7 +208,6 @@ function Tickets({ onTechInfo, onCountChange }) {
     clearTimeout(catTimerRef.current);
   }, []);
 
-  // Đóng dropdown danh mục khi nhấp ra ngoài
   useEffect(() => {
     if (!catOpen) return undefined;
     const onDocMouseDown = (e) => {
@@ -503,7 +222,7 @@ function Tickets({ onTechInfo, onCountChange }) {
     return () => document.removeEventListener('mousedown', onDocMouseDown);
   }, [catOpen, selectedCategory]);
 
-  // Tải danh sách vé
+  // Tải danh sách vé (không truyền page khi ở trang 1 và không lọc nếu muốn giữ nhưng ở đây phân trang ổn định 10 vé/trang)
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
@@ -525,6 +244,7 @@ function Tickets({ onTechInfo, onCountChange }) {
 
       if (!r.ok) {
         setError(getFriendlyError(r, 'load-tickets'));
+        onTechInfo?.({ service: 'tickets', ok: false });
         return;
       }
 
@@ -540,10 +260,10 @@ function Tickets({ onTechInfo, onCountChange }) {
       }
       setError('');
       setHasLoaded(true);
-      onCountChange?.(nextTotal);
 
       onTechInfo?.({
         service: 'tickets',
+        ok: true,
         cache: r.cache || r.body.cache || '-',
         ms: r.ms,
         servedBy: r.body.served_by || '-',
@@ -556,7 +276,7 @@ function Tickets({ onTechInfo, onCountChange }) {
       controller.abort();
       clearTimeout(loadingTimer);
     };
-  }, [appliedQuery, selectedCategory, page, reloadNonce, hasLoaded, onTechInfo, onCountChange]);
+  }, [appliedQuery, selectedCategory, page, reloadNonce, hasLoaded, onTechInfo]);
 
   // Tìm danh mục phía server
   useEffect(() => {
@@ -626,6 +346,7 @@ function Tickets({ onTechInfo, onCountChange }) {
     setSearchInput('');
     setAppliedQuery('');
     setPage(1);
+    searchInputRef?.current?.focus();
   };
 
   const openCategoryDropdown = () => {
@@ -782,7 +503,6 @@ function Tickets({ onTechInfo, onCountChange }) {
       setReloadNonce(n => n + 1);
       ticketEventInputRef.current?.focus();
     } else {
-      // Giữ nguyên dữ liệu đã nhập để sửa ngay (AC20, AC32)
       setCreateStatus({ type: 'error', text: getFriendlyError(r, 'create-ticket') });
     }
   };
@@ -794,371 +514,737 @@ function Tickets({ onTechInfo, onCountChange }) {
   const displayTotalPages = Math.max(totalPages, 1);
 
   return (
-    <section className="workspace-split" aria-labelledby="tickets-heading">
-      {/* Cột trái: Bộ lọc + Danh sách vé + Phân trang */}
-      <div className="card main-pane">
-        <div className="pane-header">
+    <section id="quan-ly-ve" className="section-block" aria-labelledby="tickets-heading">
+      <div className="section-header">
+        <div>
+          <span className="section-tag tag-ops">Nghiệp vụ trọng tâm</span>
           <h2 id="tickets-heading">Quản lý vé</h2>
-          <div className="summary-inline" aria-live="polite" aria-atomic="true">
-            <span className="count-badge">Tìm thấy {total} vé</span>
-            {activeFilterLabel && (
-              <span className="filter-pill">Đang lọc: {activeFilterLabel}</span>
-            )}
-            {total > 0 && (
-              <span className="page-meta">Trang {page}/{displayTotalPages}</span>
-            )}
-          </div>
         </div>
+        <div className="summary-inline" aria-live="polite" aria-atomic="true">
+          <span className="count-badge">Tìm thấy {total} vé</span>
+          {activeFilterLabel && (
+            <span className="filter-pill">Đang lọc: {activeFilterLabel}</span>
+          )}
+          {total > 0 && (
+            <span className="page-meta">Trang {page}/{displayTotalPages}</span>
+          )}
+        </div>
+      </div>
 
-        {/* Thanh tìm kiếm & lọc gọn trên 1 khối */}
-        <div className="filter-toolbar" role="search" aria-label="Bộ lọc tìm kiếm vé">
-          <div className="filter-toolbar-grid">
-            <div className="field">
-              <label className="field-label" htmlFor="ts-search-input">
-                Tìm theo tên sự kiện
-              </label>
-              <div className="input-wrap">
-                <input
-                  id="ts-search-input"
-                  type="text"
-                  className="field-input input-with-action"
-                  placeholder="Ví dụ: Su kien mau"
-                  maxLength={100}
-                  value={searchInput}
-                  onChange={e => handleSearchChange(e.target.value)}
-                  onKeyDown={handleSearchKeyDown}
-                  aria-describedby="ts-search-hint"
-                />
-                {searchInput && (
+      <div className="workbench-grid">
+        {/* Cột trái (65%): Bộ lọc + Danh sách cuống vé + Phân trang */}
+        <div className="card card-ops">
+          <div className="filter-toolbar" role="search" aria-label="Bộ lọc tìm kiếm vé">
+            <div className="filter-toolbar-grid">
+              <div className="field">
+                <label className="field-label" htmlFor="ts-search-input">
+                  Tìm theo tên sự kiện
+                </label>
+                <div className="input-wrap">
+                  <input
+                    ref={searchInputRef}
+                    id="ts-search-input"
+                    type="text"
+                    className="field-input input-with-action"
+                    placeholder="Ví dụ: Su kien mau"
+                    maxLength={100}
+                    value={searchInput}
+                    onChange={e => handleSearchChange(e.target.value)}
+                    onKeyDown={handleSearchKeyDown}
+                    aria-describedby="ts-search-hint"
+                  />
+                  {searchInput && (
+                    <button
+                      type="button"
+                      className="inline-icon-btn"
+                      onClick={clearSearchInput}
+                      aria-label="Xoá từ khoá tìm kiếm"
+                      title="Xoá từ khoá"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                <p id="ts-search-hint" className="field-hint">
+                  Tìm một phần tên sự kiện, không phân biệt chữ hoa/thường.
+                </p>
+              </div>
+
+              <div className="field" ref={catBoxRef}>
+                <label className="field-label" htmlFor="ts-category-input">
+                  Danh mục
+                </label>
+                <div className="combobox-wrap">
+                  <input
+                    id="ts-category-input"
+                    type="text"
+                    role="combobox"
+                    className="field-input input-with-action"
+                    placeholder="Tất cả danh mục"
+                    maxLength={100}
+                    autoComplete="off"
+                    aria-expanded={catOpen}
+                    aria-controls="ts-category-listbox"
+                    aria-autocomplete="list"
+                    aria-describedby="ts-category-hint"
+                    aria-activedescendant={
+                      catOpen && !catShowLoading && !catError && visibleCatOptions[catActiveIndex]
+                        ? `ts-cat-opt-${catActiveIndex}`
+                        : undefined
+                    }
+                    value={catInput}
+                    onFocus={e => {
+                      openCategoryDropdown();
+                      e.target.select();
+                    }}
+                    onClick={() => {
+                      if (!catOpen) openCategoryDropdown();
+                    }}
+                    onChange={e => handleCatInputChange(e.target.value)}
+                    onKeyDown={handleCatKeyDown}
+                  />
                   <button
                     type="button"
                     className="inline-icon-btn"
-                    onClick={clearSearchInput}
-                    aria-label="Xoá từ khoá tìm kiếm"
-                    title="Xoá từ khoá"
+                    tabIndex={-1}
+                    aria-label={catOpen ? 'Đóng danh sách danh mục' : 'Mở danh sách danh mục'}
+                    onMouseDown={e => {
+                      e.preventDefault();
+                      if (catOpen) closeCategoryDropdown();
+                      else openCategoryDropdown();
+                    }}
                   >
-                    ×
+                    ▾
                   </button>
-                )}
-              </div>
-              <p id="ts-search-hint" className="field-hint">
-                Tìm một phần tên sự kiện, không phân biệt hoa/thường.
-              </p>
-            </div>
 
-            <div className="field" ref={catBoxRef}>
-              <label className="field-label" htmlFor="ts-category-input">
-                Danh mục
-              </label>
-              <div className="combobox-wrap">
-                <input
-                  id="ts-category-input"
-                  type="text"
-                  role="combobox"
-                  className="field-input input-with-action"
-                  placeholder="Tất cả danh mục"
-                  maxLength={100}
-                  autoComplete="off"
-                  aria-expanded={catOpen}
-                  aria-controls="ts-category-listbox"
-                  aria-autocomplete="list"
-                  aria-describedby="ts-category-hint"
-                  aria-activedescendant={
-                    catOpen && !catShowLoading && !catError && visibleCatOptions[catActiveIndex]
-                      ? `ts-cat-opt-${catActiveIndex}`
-                      : undefined
-                  }
-                  value={catInput}
-                  onFocus={e => {
-                    openCategoryDropdown();
-                    e.target.select();
-                  }}
-                  onClick={() => {
-                    if (!catOpen) openCategoryDropdown();
-                  }}
-                  onChange={e => handleCatInputChange(e.target.value)}
-                  onKeyDown={handleCatKeyDown}
-                />
+                  {catOpen && (
+                    <ul
+                      id="ts-category-listbox"
+                      role="listbox"
+                      aria-label="Danh sách danh mục"
+                      className="dropdown-list"
+                    >
+                      {catShowLoading && (
+                        <li role="option" aria-selected="false" aria-disabled="true" className="dropdown-status">
+                          Đang tải...
+                        </li>
+                      )}
+                      {!catShowLoading && catError && (
+                        <li role="option" aria-selected="false" aria-disabled="true" className="dropdown-status dropdown-error">
+                          ⚠ {catError}
+                        </li>
+                      )}
+                      {!catShowLoading && !catError && visibleCatOptions.length === 0 && (
+                        <li role="option" aria-selected="false" aria-disabled="true" className="dropdown-status">
+                          Không tìm thấy danh mục
+                        </li>
+                      )}
+                      {!catShowLoading && !catError && visibleCatOptions.map((opt, idx) => {
+                        const isSelected = opt.value === selectedCategory;
+                        const isActive = idx === catActiveIndex;
+                        return (
+                          <li
+                            key={opt.value === '' ? '__all__' : opt.value}
+                            id={`ts-cat-opt-${idx}`}
+                            role="option"
+                            aria-selected={isSelected}
+                            className={`dropdown-option${isActive ? ' is-active' : ''}${isSelected ? ' is-selected' : ''}`}
+                            onMouseEnter={() => setCatActiveIndex(idx)}
+                            onMouseDown={e => {
+                              e.preventDefault();
+                              selectCategory(opt.value);
+                            }}
+                          >
+                            <span>{opt.label}</span>
+                            {isSelected && <span aria-hidden="true">✓</span>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+                <p id="ts-category-hint" className="field-hint">
+                  Mở để chọn hoặc gõ tìm danh mục.
+                </p>
+              </div>
+
+              <div className="filter-clear-col">
                 <button
                   type="button"
-                  className="inline-icon-btn"
-                  tabIndex={-1}
-                  aria-label={catOpen ? 'Đóng danh sách danh mục' : 'Mở danh sách danh mục'}
-                  onMouseDown={e => {
-                    e.preventDefault();
-                    if (catOpen) closeCategoryDropdown();
-                    else openCategoryDropdown();
-                  }}
+                  className="btn-secondary"
+                  disabled={!hasActiveFilter}
+                  onClick={clearAllFilters}
                 >
-                  ▾
+                  Xoá bộ lọc
                 </button>
-
-                {catOpen && (
-                  <ul
-                    id="ts-category-listbox"
-                    role="listbox"
-                    aria-label="Danh sách danh mục"
-                    className="dropdown-list"
-                  >
-                    {catShowLoading && (
-                      <li role="option" aria-selected="false" aria-disabled="true" className="dropdown-status">
-                        Đang tải...
-                      </li>
-                    )}
-                    {!catShowLoading && catError && (
-                      <li role="option" aria-selected="false" aria-disabled="true" className="dropdown-status dropdown-error">
-                        ⚠ {catError}
-                      </li>
-                    )}
-                    {!catShowLoading && !catError && visibleCatOptions.length === 0 && (
-                      <li role="option" aria-selected="false" aria-disabled="true" className="dropdown-status">
-                        Không tìm thấy danh mục
-                      </li>
-                    )}
-                    {!catShowLoading && !catError && visibleCatOptions.map((opt, idx) => {
-                      const isSelected = opt.value === selectedCategory;
-                      const isActive = idx === catActiveIndex;
-                      return (
-                        <li
-                          key={opt.value === '' ? '__all__' : opt.value}
-                          id={`ts-cat-opt-${idx}`}
-                          role="option"
-                          aria-selected={isSelected}
-                          className={`dropdown-option${isActive ? ' is-active' : ''}${isSelected ? ' is-selected' : ''}`}
-                          onMouseEnter={() => setCatActiveIndex(idx)}
-                          onMouseDown={e => {
-                            e.preventDefault();
-                            selectCategory(opt.value);
-                          }}
-                        >
-                          <span>{opt.label}</span>
-                          {isSelected && <span aria-hidden="true">✓</span>}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
               </div>
-              <p id="ts-category-hint" className="field-hint">
-                Chọn hoặc gõ tên danh mục.
-              </p>
-            </div>
-
-            <div className="filter-clear-col">
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={!hasActiveFilter}
-                onClick={clearAllFilters}
-              >
-                Xoá bộ lọc
-              </button>
             </div>
           </div>
-        </div>
 
-        {/* Thông báo lỗi tải vé */}
-        {error && (
-          <div className="state-box state-error" role="alert">
-            <p className="state-text">⚠ Lỗi: {error}</p>
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={showLoading}
-              onClick={() => setReloadNonce(n => n + 1)}
-            >
-              {showLoading ? 'Đang tải...' : 'Thử lại'}
-            </button>
-          </div>
-        )}
-
-        {/* Vùng danh sách vé */}
-        <div className="list-region ticket-list-region" aria-live="polite">
-          {showLoading && (
-            <div className="state-box state-loading" role="status">
-              <p className="state-text">Đang tải...</p>
-            </div>
-          )}
-
-          {!showLoading && !error && hasLoaded && items.length === 0 && (
-            <div className="state-box state-empty">
-              <p className="state-title">Không tìm thấy vé phù hợp</p>
-              <p className="state-hint">
-                Thử bỏ bớt từ khoá hoặc chọn &ldquo;Tất cả danh mục&rdquo; để xem lại danh sách.
-              </p>
+          {error && (
+            <div className="state-box state-error" role="alert">
+              <p className="state-text">⚠ Lỗi: {error}</p>
               <button
                 type="button"
-                className="btn-secondary"
-                onClick={clearAllFilters}
+                className="btn-primary"
+                disabled={showLoading}
+                onClick={() => setReloadNonce(n => n + 1)}
               >
-                Xoá bộ lọc
+                {showLoading ? 'Đang tải...' : 'Thử lại'}
               </button>
             </div>
           )}
 
-          {items.length > 0 && (
-            <ul className="ticket-list" aria-label="Danh sách vé">
-              {items.map(t => (
-                <li key={t.id} className="ticket-item">
-                  <div className="ticket-main">
-                    <span className="ticket-event">{t.event}</span>
-                    <span className="ticket-chip">{t.category || 'Khac'}</span>
-                  </div>
-                  <div className="ticket-numbers">
-                    <span className="ticket-price">{Number(t.price).toLocaleString('vi-VN')} đ</span>
-                    <span className="ticket-qty">{Number(t.quantity).toLocaleString('vi-VN')} vé</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
+          <div className="list-region ticket-list-region" aria-live="polite">
+            {showLoading && (
+              <div className="state-box state-loading" role="status">
+                <p className="state-text">Đang tải...</p>
+              </div>
+            )}
+
+            {!showLoading && !error && hasLoaded && items.length === 0 && (
+              <div className="state-box state-empty">
+                <p className="state-title">Không tìm thấy vé phù hợp</p>
+                <p className="state-hint">
+                  Thử bỏ bớt từ khoá hoặc chọn &ldquo;Tất cả danh mục&rdquo; để xem lại danh sách.
+                </p>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={clearAllFilters}
+                >
+                  Xoá bộ lọc
+                </button>
+              </div>
+            )}
+
+            {items.length > 0 && (
+              <ul className="ticket-stub-list" aria-label="Danh sách vé">
+                {items.map(t => (
+                  <li key={t.id} className="ticket-stub-row">
+                    <div className="ticket-stub-body">
+                      <span className="ticket-event">{t.event}</span>
+                      <span className="ticket-chip">{t.category || 'Khac'}</span>
+                    </div>
+                    <div className="tear-line" aria-hidden="true" />
+                    <div className="ticket-stub-meta">
+                      <span className="ticket-price">{Number(t.price).toLocaleString('vi-VN')} đ</span>
+                      <span className="ticket-qty">{Number(t.quantity).toLocaleString('vi-VN')} vé</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {total > 0 && (
+            <nav className="pagination-bar" aria-label="Phân trang danh sách vé">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={page <= 1 || showLoading}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+              >
+                Trước
+              </button>
+              <span className="page-indicator">
+                Trang {page}/{displayTotalPages}
+              </span>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={page >= displayTotalPages || showLoading}
+                onClick={() => setPage(p => Math.min(displayTotalPages, p + 1))}
+              >
+                Sau
+              </button>
+            </nav>
           )}
         </div>
 
-        {/* Phân trang */}
-        {total > 0 && (
-          <nav className="pagination-bar" aria-label="Phân trang danh sách vé">
-            <button
-              type="button"
-              className="btn-secondary"
-              disabled={page <= 1 || showLoading}
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-            >
-              Trước
-            </button>
-            <span className="page-indicator">
-              Trang {page}/{displayTotalPages}
-            </span>
-            <button
-              type="button"
-              className="btn-secondary"
-              disabled={page >= displayTotalPages || showLoading}
-              onClick={() => setPage(p => Math.min(displayTotalPages, p + 1))}
-            >
-              Sau
-            </button>
-          </nav>
-        )}
-      </div>
-
-      {/* Cột phải: Biểu mẫu thêm vé mới */}
-      <aside className="card side-pane">
-        <form className="create-form" onSubmit={handleCreateTicket} noValidate aria-label="Thêm vé mới">
-          <div className="pane-header">
+        {/* Cột phải (35%): Biểu mẫu Thêm vé mới */}
+        <aside className="card card-form">
+          <form className="create-form" onSubmit={handleCreateTicket} noValidate aria-label="Thêm vé mới">
             <h3 className="form-heading">Thêm vé mới</h3>
-          </div>
 
-          <div className="form-stack">
-            <div className="field">
-              <label className="field-label" htmlFor="ticket-event-input">
-                Tên sự kiện <span aria-hidden="true">*</span>
-              </label>
-              <input
-                ref={ticketEventInputRef}
-                id="ticket-event-input"
-                type="text"
-                className="field-input"
-                placeholder="Ví dụ: Đêm nhạc Mùa Thu"
-                maxLength={150}
-                value={form.event}
-                onChange={e => setForm({ ...form, event: e.target.value })}
-                aria-describedby="ticket-event-hint"
-                required
-              />
-              <p id="ticket-event-hint" className="field-hint">
-                Tối đa 150 ký tự.
-              </p>
-            </div>
-
-            <div className="field">
-              <label className="field-label" htmlFor="ticket-category-input">
-                Danh mục
-              </label>
-              <input
-                ref={ticketCategoryInputRef}
-                id="ticket-category-input"
-                type="text"
-                className="field-input"
-                placeholder="Ví dụ: Am nhac"
-                maxLength={100}
-                value={form.category}
-                onChange={e => setForm({ ...form, category: e.target.value })}
-                aria-describedby="ticket-category-create-hint"
-              />
-              <p id="ticket-category-create-hint" className="field-hint">
-                Bỏ trống mặc định là &ldquo;Khac&rdquo; (tối đa 100 ký tự).
-              </p>
-            </div>
-
-            <div className="create-two-col">
+            <div className="form-stack">
               <div className="field">
-                <label className="field-label" htmlFor="ticket-price-input">
-                  Giá vé (đồng) <span aria-hidden="true">*</span>
+                <label className="field-label" htmlFor="ticket-event-input">
+                  Tên sự kiện <span aria-hidden="true">*</span>
                 </label>
                 <input
-                  ref={ticketPriceInputRef}
-                  id="ticket-price-input"
+                  ref={ticketEventInputRef}
+                  id="ticket-event-input"
                   type="text"
-                  inputMode="numeric"
                   className="field-input"
-                  placeholder="150000"
-                  value={form.price}
-                  onChange={e => setForm({ ...form, price: e.target.value })}
-                  aria-describedby="ticket-price-hint"
+                  placeholder="Ví dụ: Đêm nhạc Mùa Thu"
+                  maxLength={150}
+                  value={form.event}
+                  onChange={e => setForm({ ...form, event: e.target.value })}
+                  aria-describedby="ticket-event-hint"
                   required
                 />
-                <p id="ticket-price-hint" className="field-hint">
-                  Giá tính bằng đồng, ví dụ 150000.
+                <p id="ticket-event-hint" className="field-hint">
+                  Tối đa 150 ký tự.
                 </p>
               </div>
 
               <div className="field">
-                <label className="field-label" htmlFor="ticket-qty-input">
-                  Số lượng <span aria-hidden="true">*</span>
+                <label className="field-label" htmlFor="ticket-category-input">
+                  Danh mục
                 </label>
                 <input
-                  ref={ticketQtyInputRef}
-                  id="ticket-qty-input"
+                  ref={ticketCategoryInputRef}
+                  id="ticket-category-input"
                   type="text"
-                  inputMode="numeric"
                   className="field-input"
-                  placeholder="50"
-                  value={form.quantity}
-                  onChange={e => setForm({ ...form, quantity: e.target.value })}
-                  aria-describedby="ticket-qty-hint"
-                  required
+                  placeholder="Ví dụ: Am nhac"
+                  maxLength={100}
+                  value={form.category}
+                  onChange={e => setForm({ ...form, category: e.target.value })}
+                  aria-describedby="ticket-category-create-hint"
                 />
-                <p id="ticket-qty-hint" className="field-hint">
-                  Số nguyên, ví dụ 50.
+                <p id="ticket-category-create-hint" className="field-hint">
+                  Để trống mặc định là &ldquo;Khac&rdquo; (tối đa 100 ký tự).
                 </p>
               </div>
+
+              <div className="create-two-col">
+                <div className="field">
+                  <label className="field-label" htmlFor="ticket-price-input">
+                    Giá vé (đồng) <span aria-hidden="true">*</span>
+                  </label>
+                  <input
+                    ref={ticketPriceInputRef}
+                    id="ticket-price-input"
+                    type="text"
+                    inputMode="numeric"
+                    className="field-input"
+                    placeholder="150000"
+                    value={form.price}
+                    onChange={e => setForm({ ...form, price: e.target.value })}
+                    aria-describedby="ticket-price-hint"
+                    required
+                  />
+                  <p id="ticket-price-hint" className="field-hint">
+                    Giá tính bằng đồng, ví dụ 150000.
+                  </p>
+                </div>
+
+                <div className="field">
+                  <label className="field-label" htmlFor="ticket-qty-input">
+                    Số lượng <span aria-hidden="true">*</span>
+                  </label>
+                  <input
+                    ref={ticketQtyInputRef}
+                    id="ticket-qty-input"
+                    type="text"
+                    inputMode="numeric"
+                    className="field-input"
+                    placeholder="50"
+                    value={form.quantity}
+                    onChange={e => setForm({ ...form, quantity: e.target.value })}
+                    aria-describedby="ticket-qty-hint"
+                    required
+                  />
+                  <p id="ticket-qty-hint" className="field-hint">
+                    Số nguyên, ví dụ 50.
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div className="form-actions">
-            <button type="submit" className="btn-primary" disabled={creating}>
-              {creating ? 'Đang gửi...' : 'Thêm vé'}
-            </button>
-          </div>
+            <div className="form-actions">
+              <button type="submit" className="btn-primary" disabled={creating}>
+                {creating ? 'Đang gửi...' : 'Thêm vé'}
+              </button>
+            </div>
 
-          {createStatus.type === 'success' && (
-            <p className="feedback feedback-success" role="status" aria-live="polite">
-              ✓ Thành công: {createStatus.text}
-            </p>
-          )}
-          {createStatus.type === 'error' && (
-            <p className="feedback feedback-error" role="alert">
-              ⚠ Lỗi: {createStatus.text}
-            </p>
-          )}
-        </form>
-      </aside>
+            {createStatus.type === 'success' && (
+              <p className="feedback feedback-success" role="status" aria-live="polite">
+                ✓ Thành công: {createStatus.text}
+              </p>
+            )}
+            {createStatus.type === 'error' && (
+              <p className="feedback feedback-error" role="alert">
+                ⚠ Lỗi: {createStatus.text}
+              </p>
+            )}
+          </form>
+        </aside>
+      </div>
     </section>
   );
 }
 
+/* ===== SECTION 05: QUẢN LÝ NGƯỜI DÙNG (Database-per-Service: users_db) ===== */
+function Users({ onTechInfo }) {
+  const [items, setItems] = useState([]);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadNonce, setReloadNonce] = useState(0);
+
+  const [editingUser, setEditingUser] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+
+  const [form, setForm] = useState({ name: '', email: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState({ type: '', text: '' });
+
+  const nameInputRef = useRef(null);
+  const emailInputRef = useRef(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    setLoading(true);
+
+    (async () => {
+      const r = await api('/api/users', { signal: controller.signal });
+      if (!active || r.aborted) return;
+      setLoading(false);
+      if (!r.ok) {
+        setLoadError(getFriendlyError(r, 'load-users'));
+        onTechInfo?.({ service: 'users', ok: false });
+        return;
+      }
+      const nextItems = Array.isArray(r.body.items) ? r.body.items : [];
+      setItems(nextItems);
+      setLoadError('');
+      setHasLoaded(true);
+      onTechInfo?.({
+        service: 'users',
+        ok: true,
+        ms: r.ms,
+        servedBy: r.body.served_by || '-',
+        upstream: r.upstream || '-',
+      });
+    })();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [reloadNonce, onTechInfo]);
+
+  const startEdit = (user) => {
+    setEditingUser(user);
+    setConfirmDeleteId(null);
+    setForm({ name: user.name, email: user.email });
+    setFeedback({ type: '', text: '' });
+    setTimeout(() => nameInputRef.current?.focus(), 0);
+  };
+
+  const cancelEdit = () => {
+    setEditingUser(null);
+    setForm({ name: '', email: '' });
+    setFeedback({ type: '', text: '' });
+    nameInputRef.current?.focus();
+  };
+
+  const handleDelete = async (user) => {
+    if (deletingId) return;
+    setDeletingId(user.id);
+    setFeedback({ type: '', text: '' });
+
+    const r = await api(`/api/users/${user.id}`, { method: 'DELETE' });
+    setDeletingId(null);
+    setConfirmDeleteId(null);
+
+    if (r.ok) {
+      if (editingUser && editingUser.id === user.id) {
+        setEditingUser(null);
+        setForm({ name: '', email: '' });
+      }
+      setFeedback({ type: 'success', text: `Đã xoá người dùng '${user.name}'.` });
+      setReloadNonce(n => n + 1);
+    } else {
+      if (r.status === 404) setReloadNonce(n => n + 1);
+      setFeedback({ type: 'error', text: getFriendlyError(r, 'delete-user') });
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (submitting) return;
+
+    const trimmedName = form.name.trim();
+    const trimmedEmail = form.email.trim();
+
+    if (!trimmedName) {
+      setFeedback({ type: 'error', text: 'Vui lòng nhập họ và tên người dùng.' });
+      nameInputRef.current?.focus();
+      return;
+    }
+    if (trimmedName.length > 100) {
+      setFeedback({ type: 'error', text: 'Họ và tên không được vượt quá 100 ký tự.' });
+      nameInputRef.current?.focus();
+      return;
+    }
+    if (!trimmedEmail || !EMAIL_RE.test(trimmedEmail)) {
+      setFeedback({
+        type: 'error',
+        text: 'Địa chỉ email chưa đúng định dạng. Vui lòng nhập theo mẫu ten@mien.com.',
+      });
+      emailInputRef.current?.focus();
+      return;
+    }
+    if (trimmedEmail.length > 150) {
+      setFeedback({ type: 'error', text: 'Địa chỉ email không được vượt quá 150 ký tự.' });
+      emailInputRef.current?.focus();
+      return;
+    }
+
+    setSubmitting(true);
+    setFeedback({ type: '', text: '' });
+
+    const isEdit = Boolean(editingUser);
+    const url = isEdit ? `/api/users/${editingUser.id}` : '/api/users';
+    const method = isEdit ? 'PUT' : 'POST';
+
+    const r = await api(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: trimmedName, email: trimmedEmail }),
+    });
+    setSubmitting(false);
+
+    if (r.ok) {
+      setFeedback({
+        type: 'success',
+        text: isEdit
+          ? `Đã cập nhật người dùng '${trimmedName}'.`
+          : `Đã thêm người dùng '${trimmedName}'.`,
+      });
+      setEditingUser(null);
+      setForm({ name: '', email: '' });
+      setReloadNonce(n => n + 1);
+      nameInputRef.current?.focus();
+    } else {
+      if (r.status === 404) {
+        setEditingUser(null);
+        setReloadNonce(n => n + 1);
+      }
+      setFeedback({ type: 'error', text: getFriendlyError(r, 'save-user') });
+    }
+  };
+
+  return (
+    <section id="quan-ly-nguoi-dung" className="section-block" aria-labelledby="users-heading">
+      <div className="section-header">
+        <div>
+          <span className="section-tag tag-ops">Dịch vụ độc lập · users_db</span>
+          <h2 id="users-heading">Quản lý người dùng</h2>
+        </div>
+        {hasLoaded && <span className="count-badge">{items.length} người dùng</span>}
+      </div>
+
+      <div className="workbench-grid workbench-users">
+        <div className="card card-ops">
+          {loadError && (
+            <div className="state-box state-error" role="alert">
+              <p className="state-text">⚠ Lỗi: {loadError}</p>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setReloadNonce(n => n + 1)}
+              >
+                Thử lại
+              </button>
+            </div>
+          )}
+
+          <div className="list-region user-list-region" aria-live="polite">
+            {loading && !hasLoaded && (
+              <div className="state-box state-loading" role="status">
+                <p className="state-text">Đang tải danh sách người dùng...</p>
+              </div>
+            )}
+
+            {!loading && !loadError && hasLoaded && items.length === 0 && (
+              <div className="state-box">
+                <p className="state-text">Chưa có người dùng nào trong hệ thống.</p>
+              </div>
+            )}
+
+            {items.length > 0 && (
+              <ul className="entity-list" aria-label="Danh sách người dùng">
+                {items.map(u => {
+                  const isBeingEdited = editingUser?.id === u.id;
+                  const isConfirmingDelete = confirmDeleteId === u.id;
+                  return (
+                    <li
+                      key={u.id}
+                      className={`entity-item${isBeingEdited ? ' is-editing' : ''}`}
+                    >
+                      <div className="user-info">
+                        <span className="user-avatar" aria-hidden="true">{getInitial(u.name)}</span>
+                        <div className="user-text">
+                          <span className="entity-primary">{u.name}</span>
+                          <span className="entity-secondary">{u.email}</span>
+                        </div>
+                      </div>
+
+                      <div className="row-actions">
+                        {isConfirmingDelete ? (
+                          <div className="confirm-inline" role="group" aria-label={`Xác nhận xoá ${u.name}`}>
+                            <span className="confirm-label">Xoá?</span>
+                            <button
+                              type="button"
+                              className="btn-danger btn-compact"
+                              disabled={deletingId === u.id}
+                              onClick={() => handleDelete(u)}
+                            >
+                              {deletingId === u.id ? 'Đang xoá...' : 'Xác nhận'}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-secondary btn-compact"
+                              disabled={deletingId === u.id}
+                              onClick={() => setConfirmDeleteId(null)}
+                            >
+                              Huỷ
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className="btn-secondary btn-compact"
+                              onClick={() => startEdit(u)}
+                              aria-label={`Sửa người dùng ${u.name}`}
+                            >
+                              Sửa
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-danger-outline btn-compact"
+                              onClick={() => setConfirmDeleteId(u.id)}
+                              aria-label={`Xoá người dùng ${u.name}`}
+                            >
+                              Xoá
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        <aside className="card card-form">
+          <form
+            className="create-form"
+            onSubmit={handleSubmit}
+            noValidate
+            aria-label={editingUser ? 'Chỉnh sửa người dùng' : 'Thêm người dùng mới'}
+          >
+            <div className="pane-header-inline">
+              <h3 className="form-heading">
+                {editingUser ? 'Chỉnh sửa người dùng' : 'Thêm người dùng mới'}
+              </h3>
+              {editingUser && (
+                <span className="filter-pill">Đang sửa #{editingUser.id}</span>
+              )}
+            </div>
+
+            <div className="form-stack">
+              <div className="field">
+                <label className="field-label" htmlFor="user-name-input">
+                  Họ và tên <span aria-hidden="true">*</span>
+                </label>
+                <input
+                  ref={nameInputRef}
+                  id="user-name-input"
+                  type="text"
+                  className="field-input"
+                  placeholder="Ví dụ: Nguyễn Văn An"
+                  maxLength={100}
+                  value={form.name}
+                  onChange={e => setForm({ ...form, name: e.target.value })}
+                  aria-describedby="user-name-hint"
+                  required
+                />
+                <p id="user-name-hint" className="field-hint">
+                  Tối đa 100 ký tự, ví dụ Nguyễn Văn An.
+                </p>
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="user-email-input">
+                  Địa chỉ email <span aria-hidden="true">*</span>
+                </label>
+                <input
+                  ref={emailInputRef}
+                  id="user-email-input"
+                  type="email"
+                  className="field-input"
+                  placeholder="Ví dụ: an.nguyen@example.com"
+                  maxLength={150}
+                  value={form.email}
+                  onChange={e => setForm({ ...form, email: e.target.value })}
+                  aria-describedby="user-email-hint"
+                  required
+                />
+                <p id="user-email-hint" className="field-hint">
+                  Định dạng ten@mien.com (tối đa 150 ký tự).
+                </p>
+              </div>
+            </div>
+
+            <div className="form-actions">
+              <button type="submit" className="btn-primary" disabled={submitting}>
+                {submitting
+                  ? 'Đang gửi...'
+                  : editingUser
+                    ? 'Lưu thay đổi'
+                    : 'Thêm người dùng'}
+              </button>
+              {editingUser && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={submitting}
+                  onClick={cancelEdit}
+                >
+                  Huỷ
+                </button>
+              )}
+            </div>
+
+            {feedback.type === 'success' && (
+              <p className="feedback feedback-success" role="status" aria-live="polite">
+                ✓ Thành công: {feedback.text}
+              </p>
+            )}
+            {feedback.type === 'error' && (
+              <p className="feedback feedback-error" role="alert">
+                ⚠ Lỗi: {feedback.text}
+              </p>
+            )}
+
+            <p className="privacy-note">
+              Thông tin chỉ dùng để quản lý vé trong hệ thống này.
+            </p>
+          </form>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+/* ===== SECTION 06: GIÁM SÁT CÂN BẰNG TẢI & 3 KỊCH BẢN KIỂM CHỨNG ===== */
 function LoadBalancer() {
   const [counts, setCounts] = useState({});
+  const [prevRunSummary, setPrevRunSummary] = useState('');
+  const [runErrors, setRunErrors] = useState(0);
   const [stats, setStats] = useState(null);
+  const [cacheHistory, setCacheHistory] = useState({ missMs: null, hitMs: null });
   const [busyWhoami, setBusyWhoami] = useState(false);
   const [busyStats, setBusyStats] = useState(false);
   const [lbError, setLbError] = useState('');
@@ -1166,6 +1252,14 @@ function LoadBalancer() {
   const fire = async () => {
     setBusyWhoami(true);
     setLbError('');
+
+    // Lưu tóm tắt lần chạy trước để đối chiếu Trước / Sau khi dừng 1 bản sao
+    const existingEntries = Object.entries(counts);
+    if (existingEntries.length > 0) {
+      const summary = `${existingEntries.length} bản sao (${existingEntries.map(([, v]) => v).join('/')})`;
+      setPrevRunSummary(summary);
+    }
+
     const c = {};
     let errors = 0;
     for (let i = 0; i < 30; i++) {
@@ -1178,9 +1272,8 @@ function LoadBalancer() {
     }
     if (errors === 30) {
       setLbError(SERVER_UNREACHABLE_MSG);
-    } else if (errors > 0) {
-      c['(lỗi kết nối)'] = errors;
     }
+    setRunErrors(errors);
     setCounts(c);
     setBusyWhoami(false);
   };
@@ -1194,169 +1287,347 @@ function LoadBalancer() {
       setLbError(SERVER_UNREACHABLE_MSG);
       return;
     }
-    setStats({ cache: r.cache || r.body.cache, ms: r.ms, by: r.body.served_by });
+    const cacheState = r.cache || r.body.cache;
+    setStats({ cache: cacheState, ms: r.ms, by: r.body.served_by });
+    setCacheHistory(prev => ({
+      missMs: cacheState === 'MISS' ? r.ms : prev.missMs,
+      hitMs: cacheState === 'HIT' ? r.ms : prev.hitMs,
+    }));
   };
 
-  const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+  const entries = Object.entries(counts);
+  const total = entries.reduce((a, [, b]) => a + b, 0) || 1;
 
   return (
-    <div className="lb-monitor" aria-labelledby="lb-heading">
-      <h3 id="lb-heading" className="lb-heading">Giám sát cân bằng tải</h3>
+    <div className="lab-scenarios" aria-labelledby="lb-heading">
+      <div className="lab-intro">
+        <h3 id="lb-heading" className="lb-heading">Ba kịch bản kiểm chứng trực tiếp</h3>
+        <p className="field-hint">
+          Thực hiện lần lượt 3 kịch bản dưới đây để quan sát cân bằng tải, bộ nhớ đệm Redis và khả năng chịu lỗi.
+        </p>
+      </div>
+
       {lbError && (
         <p className="feedback feedback-error" role="alert">
           ⚠ Lỗi: {lbError}
         </p>
       )}
-      <div className="row">
-        <div className="lb-col">
+
+      <div className="scenario-grid">
+        {/* Kịch bản 01: Cân bằng tải */}
+        <article className="scenario-card">
+          <div className="scenario-step">Kịch bản 01 · Cân bằng tải</div>
+          <h4 className="scenario-title">Phân phối 30 request Round-Robin</h4>
+          <p className="field-hint">
+            Gửi liên tiếp 30 yêu cầu tới <code className="inline-code">/api/tickets/whoami</code>. Vạch đứng nét đứt là mốc lý tưởng 33,3% khi chạy 3 bản sao.
+          </p>
           <button
             type="button"
-            className="btn-secondary"
+            className="btn-primary"
             disabled={busyWhoami}
             onClick={fire}
           >
-            {busyWhoami ? 'Đang gửi 30 yêu cầu...' : 'Gửi 30 request /api/tickets/whoami'}
+            {busyWhoami ? 'Đang gửi 30 yêu cầu...' : 'Gửi 30 request'}
           </button>
+
           <div className="bar-list" aria-live="polite">
-            {Object.entries(counts).map(([k, v]) => (
+            {entries.length > 0 && (
+              <div className="compare-strip">
+                <span>
+                  Hiện tại: <b>{entries.length} bản sao</b> ({entries.map(([, v]) => v).join('/')}) ·{' '}
+                  <b>{runErrors} lỗi</b>
+                </span>
+                {prevRunSummary && (
+                  <span className="compare-prev">Lần trước: {prevRunSummary}</span>
+                )}
+              </div>
+            )}
+            {entries.map(([k, v]) => (
               <div key={k} className="bar">
-                <span>{k}</span>
-                <div className="bar-track">
+                <span className="mono-label" title={k}>{k}</span>
+                <div className="bar-track bar-track-ideal" title="Vạch mốc lý thuyết 33,3%">
                   <i style={{ width: `${(v / total) * 100}%` }} />
                 </div>
-                <b>{v}</b>
+                <b className="mono-num">{v}</b>
               </div>
             ))}
           </div>
-        </div>
-        <div className="lb-col">
+        </article>
+
+        {/* Kịch bản 02: Bộ nhớ đệm Redis */}
+        <article className="scenario-card">
+          <div className="scenario-step">Kịch bản 02 · Cache-aside</div>
+          <h4 className="scenario-title">So sánh truy vấn nặng MISS rồi HIT</h4>
+          <p className="field-hint">
+            Bấm lần 1 truy vấn cơ sở dữ liệu (mô phỏng trễ ~500 ms); bấm lần 2 trong vòng 60 giây lấy ngay từ Redis.
+          </p>
           <button
             type="button"
             className="btn-secondary"
             disabled={busyStats}
             onClick={heavy}
           >
-            {busyStats ? 'Đang tải thống kê...' : 'Gọi truy vấn nặng /api/tickets/stats'}
+            {busyStats ? 'Đang tải thống kê...' : 'Gọi truy vấn nặng (/stats)'}
           </button>
+
           {stats && (
-            <p className="meta" aria-live="polite">
-              Nguồn: <b>{formatCacheSource(stats.cache)}</b> · Thời gian: <b>{stats.ms} ms</b> · Bản sao: <b>{stats.by}</b>
-            </p>
+            <div className="cache-result-box" aria-live="polite">
+              <span className={`cache-badge ${stats.cache === 'HIT' ? 'is-hit' : 'is-miss'}`}>
+                {stats.cache === 'HIT' ? '✓ REDIS · HIT' : '● DB · MISS'}
+              </span>
+              <p className="meta">
+                Nguồn: <b>{formatCacheSource(stats.cache)}</b>
+              </p>
+              <p className="meta">
+                Thời gian phản hồi: <b className="mono-num">{stats.ms} ms</b> · Bản sao:{' '}
+                <b className="mono-label">{stats.by}</b>
+              </p>
+              {cacheHistory.missMs !== null && cacheHistory.hitMs !== null && (
+                <p className="speedup-note">
+                  Đối chiếu trực tiếp: MISS <b>{cacheHistory.missMs} ms</b> → HIT <b>{cacheHistory.hitMs} ms</b>
+                </p>
+              )}
+            </div>
           )}
+        </article>
+
+        {/* Kịch bản 03: Chịu lỗi (chỉ hướng dẫn lệnh CLI, không có nút dừng container) */}
+        <article className="scenario-card">
+          <div className="scenario-step">Kịch bản 03 · Chịu lỗi (HA)</div>
+          <h4 className="scenario-title">Dừng 1 bản sao bằng dòng lệnh</h4>
           <p className="field-hint">
-            Gọi lần 1 chậm khoảng 0,5 giây do truy vấn cơ sở dữ liệu; lần sau lấy nhanh từ bộ nhớ đệm Redis.
+            1. Chạy lệnh dưới đây trong Terminal để dừng đột ngột 1 container (nhấp vào ô lệnh để chọn nhanh):
           </p>
-        </div>
+          <code className="cli-box" tabIndex={0} aria-label="Lệnh dừng một bản sao ticket-service">
+            ./scripts/kill-one.sh
+          </code>
+          <p className="field-hint">
+            2. Bấm lại nút <b>&ldquo;Gửi 30 request&rdquo;</b> ở Kịch bản 01: tải tự dồn sang các bản sao còn sống với <b>0 lỗi</b>.
+          </p>
+          <p className="field-hint">
+            3. Khôi phục lại đủ 3 bản sao:
+          </p>
+          <code className="cli-box" tabIndex={0} aria-label="Lệnh khôi phục 3 bản sao ticket-service">
+            ./scripts/scale.sh 3
+          </code>
+        </article>
       </div>
     </div>
   );
 }
 
+/* ===== SECTION 07: BẰNG CHỨNG KỸ THUẬT (Chỉ dùng số đo thực nghiệm thật) ===== */
+function TechnicalEvidenceSection() {
+  const replicas = [
+    { name: 'Bản sao 01', count: 99, pct: 33.0 },
+    { name: 'Bản sao 02', count: 99, pct: 33.0 },
+    { name: 'Bản sao 03', count: 102, pct: 34.0 },
+  ];
+
+  return (
+    <section className="section-block" aria-labelledby="evidence-heading">
+      <div className="section-header">
+        <div>
+          <span className="section-tag tag-tech">Số liệu thực nghiệm đã xác thực</span>
+          <h2 id="evidence-heading">Bằng chứng kỹ thuật trên môi trường Docker</h2>
+        </div>
+      </div>
+
+      <div className="card card-tech">
+        <dl className="evidence-metrics">
+          <div className="metric-tile">
+            <dt>Độ tin cậy (300 request)</dt>
+            <dd className="metric-number is-good">0 lỗi</dd>
+            <span className="metric-sub">Chia đều 99 / 99 / 102 qua 3 bản sao</span>
+          </div>
+
+          <div className="metric-tile">
+            <dt>Độ trễ vận hành bình thường</dt>
+            <dd className="metric-number">p95: 2,2 ms</dd>
+            <span className="metric-sub">Độ trễ tối đa: 11,7 ms</span>
+          </div>
+
+          <div className="metric-tile">
+            <dt>Khi dừng đột ngột 1 bản sao</dt>
+            <dd className="metric-number is-warn">≈ 1006 ms</dd>
+            <span className="metric-sub">Độ trễ tối đa lúc Nginx chờ 1s chuyển tiếp</span>
+          </div>
+
+          <div className="metric-tile metric-unmeasured">
+            <dt>Độ trễ bộ nhớ đệm Redis</dt>
+            <dd className="metric-placeholder">Chưa đo</dd>
+            <span className="metric-sub">Đo trực tiếp tại Kịch bản 02 phía trên</span>
+          </div>
+        </dl>
+
+        <div className="evidence-bars" role="group" aria-label="Phân phối thực nghiệm 300 request trên 3 bản sao">
+          <p className="evidence-bars-title">
+            Phân phối thực tế 300 request qua Nginx Round-Robin:
+          </p>
+          {replicas.map(r => (
+            <div key={r.name} className="bar">
+              <span className="mono-label">{r.name}</span>
+              <div className="bar-track bar-track-ideal">
+                <i style={{ width: `${r.pct}%` }} />
+              </div>
+              <b className="mono-num">{r.count} req ({r.pct.toFixed(1).replace('.', ',')}%)</b>
+            </div>
+          ))}
+        </div>
+
+        <p className="evidence-source">
+          Nguồn số đo: Đo kiểm thực tế của nhóm bằng <code className="inline-code">scripts/lb_test.py --n 300</code> qua cổng Gateway <code className="inline-code">:8080</code> trên Docker Compose cục bộ (<code className="inline-code">--scale ticket-service=3</code>).
+        </p>
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState('tickets'); // 'tickets' | 'users'
-  const [counts, setCounts] = useState({ tickets: null, users: null });
   const [techState, setTechState] = useState({ tickets: null, users: null });
+  const searchInputRef = useRef(null);
 
   const handleTechInfo = useRef((info) => {
     setTechState(prev => ({ ...prev, [info.service]: info }));
   }).current;
 
-  const handleTicketCount = useRef((n) => {
-    setCounts(prev => ({ ...prev, tickets: n }));
-  }).current;
+  const gatewayStatus =
+    techState.tickets?.ok || techState.users?.ok
+      ? 'online'
+      : techState.tickets?.ok === false && techState.users?.ok === false
+        ? 'offline'
+        : 'checking';
 
-  const handleUserCount = useRef((n) => {
-    setCounts(prev => ({ ...prev, users: n }));
-  }).current;
+  const jumpToSearch = () => {
+    searchInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    searchInputRef.current?.focus();
+  };
 
   return (
-    <main>
-      {/* Thanh đầu trang tối giản, gọn gàng */}
-      <header className="top-bar">
-        <div className="top-bar-main">
-          <h1>Hệ thống quản lý vé sự kiện</h1>
-          <nav className="module-tabs" aria-label="Chuyển phân hệ quản lý">
-            <button
-              type="button"
-              className={`tab-btn${activeTab === 'tickets' ? ' is-active' : ''}`}
-              aria-pressed={activeTab === 'tickets'}
-              onClick={() => setActiveTab('tickets')}
-            >
-              Quản lý vé
-              {counts.tickets !== null && <span className="tab-count">{counts.tickets}</span>}
-            </button>
-            <button
-              type="button"
-              className={`tab-btn${activeTab === 'users' ? ' is-active' : ''}`}
-              aria-pressed={activeTab === 'users'}
-              onClick={() => setActiveTab('users')}
-            >
-              Quản lý người dùng
-              {counts.users !== null && <span className="tab-count">{counts.users}</span>}
-            </button>
-          </nav>
-        </div>
+    <>
+      {/* SECTION 01: HEADER */}
+      <header className="site-header">
+        <div className="site-header-inner">
+          <div className="brand-block">
+            <span className="brand-dot" aria-hidden="true" />
+            <span className="brand-title">Đồ án Hệ phân tán · Quản trị vé Microservices</span>
+          </div>
 
-        <details className="quick-guide">
-          <summary className="quick-guide-summary">Hướng dẫn nhanh</summary>
-          <ul className="quick-guide-list">
-            <li>Chuyển giữa hai thẻ &ldquo;Quản lý vé&rdquo; và &ldquo;Quản lý người dùng&rdquo; ở thanh trên cùng.</li>
-            <li>Ở mục Quản lý vé: gõ tên sự kiện hoặc chọn danh mục để lọc tự động; bấm &ldquo;Xoá bộ lọc&rdquo; để đặt lại.</li>
-            <li>Ở mục Quản lý người dùng: dùng nút &ldquo;Sửa&rdquo; / &ldquo;Xoá&rdquo; ngay trên từng dòng hoặc thêm mới ở khung bên phải.</li>
-            <li>Mở mục &ldquo;Thông tin kỹ thuật (dành cho demo)&rdquo; cuối trang khi cần kiểm tra bộ nhớ đệm và cân bằng tải.</li>
-          </ul>
-        </details>
+          <nav className="header-nav" aria-label="Điều hướng nhanh trong trang">
+            <a href="#quan-ly-ve">Quản lý vé</a>
+            <a href="#quan-ly-nguoi-dung">Người dùng</a>
+            <a href="#kiem-chung-phan-tan">Kiểm chứng phân tán</a>
+          </nav>
+
+          <div className="gateway-status" aria-live="polite">
+            {gatewayStatus === 'online' && (
+              <span className="status-pill is-online">● Gateway :8080 sẵn sàng</span>
+            )}
+            {gatewayStatus === 'offline' && (
+              <span className="status-pill is-offline">▲ Mất kết nối Gateway</span>
+            )}
+            {gatewayStatus === 'checking' && (
+              <span className="status-pill">◌ Đang kiểm tra Gateway...</span>
+            )}
+          </div>
+        </div>
       </header>
 
-      {/* Vùng làm việc chính: chỉ hiển thị phân hệ đang chọn để giao diện thoáng, không rối */}
-      <div hidden={activeTab !== 'tickets'}>
-        <Tickets onTechInfo={handleTechInfo} onCountChange={handleTicketCount} />
-      </div>
-      <div hidden={activeTab !== 'users'}>
-        <Users onTechInfo={handleTechInfo} onCountChange={handleUserCount} />
-      </div>
+      <main>
+        {/* SECTION 02: HERO */}
+        <HeroSection
+          activeDataNode={techState.tickets?.cache}
+          onJumpSearch={jumpToSearch}
+        />
 
-      {/* Khối kỹ thuật thu gọn mặc định (AC17, AC35, AC37) */}
-      <details className="card tech-details">
-        <summary className="tech-summary">Thông tin kỹ thuật (dành cho demo)</summary>
-        <div className="tech-content">
-          <div className="tech-telemetry">
-            <div className="tech-metric-card">
-              <p className="meta">
-                <b>Truy vấn vé gần nhất (/api/tickets):</b>{' '}
-                {techState.tickets ? (
-                  <>
-                    Nguồn: <b>{formatCacheSource(techState.tickets.cache)}</b> ·{' '}
-                    <b>{techState.tickets.ms} ms</b> · Bản sao: <b>{techState.tickets.servedBy}</b> · Upstream:{' '}
-                    <b>{techState.tickets.upstream}</b>
-                  </>
-                ) : (
-                  'Chưa có dữ liệu'
-                )}
-              </p>
-            </div>
-            <div className="tech-metric-card">
-              <p className="meta">
-                <b>Truy vấn người dùng gần nhất (/api/users):</b>{' '}
-                {techState.users ? (
-                  <>
-                    Nguồn: <b>Cơ sở dữ liệu (PostgreSQL)</b> ·{' '}
-                    <b>{techState.users.ms} ms</b> · Bản sao: <b>{techState.users.servedBy}</b> · Upstream:{' '}
-                    <b>{techState.users.upstream}</b>
-                  </>
-                ) : (
-                  'Chưa có dữ liệu'
-                )}
-              </p>
+        {/* SECTION 03: HƯỚNG DẪN NHANH (Thu gọn mặc định) */}
+        <details className="quick-guide">
+          <summary className="quick-guide-summary">Hướng dẫn nhanh (4 bước thao tác &amp; bảo vệ)</summary>
+          <ul className="quick-guide-list">
+            <li>Gõ tên sự kiện hoặc mở ô Danh mục tại khu <b>Quản lý vé</b> để lọc tự động không cần bấm nút Tìm.</li>
+            <li>Điền biểu mẫu bên phải và nhấn phím <b>Enter</b> ở bất kỳ ô nào để thêm vé hoặc quản lý người dùng.</li>
+            <li>Cuộn xuống khu <b>Giám sát cân bằng tải</b> bấm &ldquo;Gửi 30 request&rdquo; để xem tỷ lệ chia tải thực tế và đối chiếu Trước/Sau sự cố.</li>
+            <li>Mở mục &ldquo;Thông tin kỹ thuật (dành cho demo)&rdquo; khi cần xem chi tiết bản sao xử lý và địa chỉ Upstream nội bộ.</li>
+          </ul>
+        </details>
+
+        {/* SECTION 04: QUẢN LÝ VÉ */}
+        <Tickets searchInputRef={searchInputRef} onTechInfo={handleTechInfo} />
+
+        {/* SECTION 05: QUẢN LÝ NGƯỜI DÙNG */}
+        <Users onTechInfo={handleTechInfo} />
+
+        {/* SECTION 06: GIÁM SÁT CÂN BẰNG TẢI & CACHE */}
+        <section id="kiem-chung-phan-tan" className="section-block" aria-labelledby="lab-section-heading">
+          <div className="section-header">
+            <div>
+              <span className="section-tag tag-tech">Kiểm chứng trực tiếp</span>
+              <h2 id="lab-section-heading">Giám sát cân bằng tải &amp; bộ nhớ đệm</h2>
             </div>
           </div>
-          <LoadBalancer />
-        </div>
-      </details>
 
-      <footer className="app-footer">
-        <p className="support-note">Cần hỗ trợ? Liên hệ quản trị viên hệ thống.</p>
+          <div className="card card-tech">
+            <LoadBalancer />
+
+            {/* Khối chi tiết kỹ thuật ẩn mặc định cho người dùng thường (AC17, AC35, AC37) */}
+            <details className="tech-details">
+              <summary className="tech-summary">Thông tin kỹ thuật (dành cho demo)</summary>
+              <div className="tech-content">
+                <div className="tech-telemetry">
+                  <div className="tech-metric-card">
+                    <p className="meta">
+                      <b>Truy vấn vé gần nhất (/api/tickets):</b>{' '}
+                      {techState.tickets?.ok ? (
+                        <>
+                          Nguồn: <b>{formatCacheSource(techState.tickets.cache)}</b> · Thời gian:{' '}
+                          <b className="mono-num">{techState.tickets.ms} ms</b> · Bản sao:{' '}
+                          <b className="mono-label">{techState.tickets.servedBy}</b> · Upstream:{' '}
+                          <b className="mono-label">{techState.tickets.upstream}</b>
+                        </>
+                      ) : (
+                        'Chưa có dữ liệu'
+                      )}
+                    </p>
+                  </div>
+                  <div className="tech-metric-card">
+                    <p className="meta">
+                      <b>Truy vấn người dùng gần nhất (/api/users):</b>{' '}
+                      {techState.users?.ok ? (
+                        <>
+                          Nguồn: <b>Cơ sở dữ liệu (PostgreSQL)</b> · Thời gian:{' '}
+                          <b className="mono-num">{techState.users.ms} ms</b> · Bản sao:{' '}
+                          <b className="mono-label">{techState.users.servedBy}</b> · Upstream:{' '}
+                          <b className="mono-label">{techState.users.upstream}</b>
+                        </>
+                      ) : (
+                        'Chưa có dữ liệu'
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+        </section>
+
+        {/* SECTION 07: BẰNG CHỨNG KỸ THUẬT */}
+        <TechnicalEvidenceSection />
+      </main>
+
+      {/* SECTION 08: FOOTER */}
+      <footer className="site-footer">
+        <div className="site-footer-inner">
+          <div>
+            <strong>Đồ án môn Hệ phân tán</strong> · Kiến trúc Microservices với Nginx, Flask, Node.js, PostgreSQL &amp; Redis
+            <p className="support-note">Cần hỗ trợ? Liên hệ quản trị viên hệ thống.</p>
+          </div>
+          <div className="footer-links">
+            <a href="https://github.com/anh-pc/doanhephantan.git" target="_blank" rel="noreferrer">
+              Mã nguồn GitHub (anh-pc/doanhephantan)
+            </a>
+          </div>
+        </div>
       </footer>
-    </main>
+    </>
   );
 }
