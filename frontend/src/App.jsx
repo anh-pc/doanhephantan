@@ -679,7 +679,8 @@ function Tickets({ searchInputRef, onTechInfo, onCountChange, onOpenLab }) {
                 </p>
               </div>
 
-              <div className="filter-clear-col">
+              <div className="field filter-clear-col">
+                <span className="field-label field-label-spacer" aria-hidden="true">&nbsp;</span>
                 <button
                   type="button"
                   className="btn-secondary"
@@ -1615,17 +1616,6 @@ export default function App() {
       </header>
 
       <main>
-        {/* Hướng dẫn nhanh thu gọn mặc định */}
-        <details className="quick-guide">
-          <summary className="quick-guide-summary">Hướng dẫn nhanh</summary>
-          <ul className="quick-guide-list">
-            <li>Bấm các nút trên thanh điều hướng (<b>Quản lý vé</b>, <b>Người dùng</b>, <b>Kiểm chứng phân tán</b>) để chuyển màn hình làm việc ngay lập tức.</li>
-            <li>Trong <b>Quản lý vé</b>: gõ tên sự kiện hoặc chọn danh mục để lọc tự động; nhấn <b>Enter</b> trong biểu mẫu để thêm vé mới.</li>
-            <li>Trong <b>Người dùng</b>: hỗ trợ đầy đủ Thêm mới, Sửa trực tiếp và Xoá có xác nhận an toàn.</li>
-            <li>Trong <b>Kiểm chứng phân tán</b>: bấm &ldquo;Gửi 30 request&rdquo; để xem chia tải Round-Robin và kiểm tra bộ nhớ đệm Redis.</li>
-          </ul>
-        </details>
-
         {/* MÀN HÌNH 1: QUẢN LÝ VÉ */}
         <div
           id="panel-tickets"

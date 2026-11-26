@@ -51,25 +51,25 @@ body {
   background: var(--color-bg);
 }
 
-/* ===== THANH ĐIỀU HƯỚNG ỨNG DỤNG (APP TOPBAR HIỆN ĐẠI — HẾT GẠCH CHÂN XẤU) ===== */
+/* ===== THANH ĐIỀU HƯỚNG ỨNG DỤNG (GHIM CỐ ĐỊNH KHI CUỘN) ===== */
 .app-topbar {
   position: sticky;
   top: 0;
-  z-index: 40;
-  background: var(--color-surface);
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.96);
   border-bottom: 1px solid var(--color-divider);
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
 }
 
 .app-topbar-inner {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 12px 20px;
+  padding: 10px 20px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 14px 20px;
+  gap: 12px 20px;
 }
 
 .app-brand {
@@ -204,18 +204,9 @@ main {
   max-width: 1180px;
   margin: 0 auto;
   padding: 20px 20px 40px;
-  min-height: calc(100vh - 165px);
+  min-height: calc(100vh - 155px);
 }
 
-.quick-guide {
-  background: var(--color-surface);
-  border: 1px solid var(--color-divider);
-  border-radius: 10px;
-  padding: 6px 16px;
-  margin-bottom: 18px;
-}
-
-.quick-guide-summary,
 .tech-summary {
   cursor: pointer;
   font-size: 15px;
@@ -223,18 +214,6 @@ main {
   line-height: 1.5;
   padding: 6px 2px;
   color: var(--color-navy);
-}
-
-.quick-guide-list {
-  margin: 6px 0 8px;
-  padding-left: 20px;
-  font-size: 15px;
-  line-height: 1.5;
-  color: var(--color-text);
-}
-
-.quick-guide-list li + li {
-  margin-top: 4px;
 }
 
 /* Dải tiêu đề từng màn hình */
@@ -304,17 +283,16 @@ main {
 }
 
 .card-ops {
-  border-top: 3px solid var(--color-accent);
+  overflow: visible;
 }
 
 .card-form {
-  border-top: 3px solid var(--color-navy);
   position: sticky;
-  top: 86px;
+  top: 78px;
 }
 
 .card-tech {
-  border-top: 3px solid var(--color-navy);
+  overflow: visible;
 }
 
 .pane-header-inline,
@@ -633,13 +611,17 @@ code:focus-visible {
   box-shadow: 0 0 0 2px var(--color-surface);
 }
 
-/* ===== Thanh lọc & Dropdown danh mục ===== */
+/* ===== Thanh lọc ghim cố định khi cuộn danh sách vé & Dropdown danh mục ===== */
 .filter-toolbar {
+  position: sticky;
+  top: 78px;
+  z-index: 30;
   background: var(--color-surface-subtle);
   border: 1px solid var(--color-divider);
   border-radius: 10px;
   padding: 14px;
   margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
 }
 
 .filter-toolbar-grid {
@@ -649,8 +631,8 @@ code:focus-visible {
   align-items: start;
 }
 
-.filter-clear-col {
-  padding-top: 27px;
+.field-label-spacer {
+  user-select: none;
 }
 
 .dropdown-list {
@@ -1351,25 +1333,36 @@ code:focus-visible {
 }
 
 @media (max-width: 767px) {
-  .app-topbar {
-    position: static;
-  }
-
   .app-topbar-inner,
   .site-footer-inner {
-    padding: 12px;
+    padding: 10px 12px;
+  }
+
+  .app-brand-sub {
+    display: none;
   }
 
   .app-nav-tabs {
     width: 100%;
-    display: grid;
-    grid-template-columns: 1fr;
+    display: flex;
+    overflow-x: auto;
   }
 
   .nav-tab-btn {
-    width: 100%;
-    justify-content: flex-start;
+    flex: 1;
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 15px;
     min-height: 44px;
+  }
+
+  .filter-toolbar {
+    position: static;
+    box-shadow: none;
+  }
+
+  .field-label-spacer {
+    display: none;
   }
 
   main {

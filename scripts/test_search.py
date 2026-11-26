@@ -367,7 +367,6 @@ class TestFrontendUXStatic(unittest.TestCase):
         self.assertIn('aria-live="polite"', self.app_jsx)
         self.assertIn('role="alert"', self.app_jsx)
         self.assertIn("Không kết nối được máy chủ. Vui lòng thử lại sau.", self.app_jsx)
-        self.assertIn("Hướng dẫn nhanh", self.app_jsx)
         self.assertIn("Cần hỗ trợ? Liên hệ quản trị viên hệ thống.", self.app_jsx)
         self.assertIn("Thông tin chỉ dùng để quản lý vé trong hệ thống này.", self.app_jsx)
         self.assertIn("Bộ nhớ đệm", self.app_jsx)
