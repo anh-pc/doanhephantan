@@ -67,11 +67,23 @@ function getInitial(name) {
 
 function getPosterTheme(category, id) {
   const cat = String(category || '').toLowerCase();
-  if (cat.includes('nhac') || cat.includes('music') || cat.includes('concert') || cat.includes('live')) {
+  if (cat.includes('nhạc') || cat.includes('nhac') || cat.includes('music') || cat.includes('concert')) {
     return { cls: 'poster-music', icon: 'music' };
   }
-  if (cat.includes('hoi') || cat.includes('tech') || cat.includes('thao') || cat.includes('work')) {
+  if (cat.includes('công nghệ') || cat.includes('hội') || cat.includes('hoi') || cat.includes('tech')) {
     return { cls: 'poster-conf', icon: 'stage' };
+  }
+  if (cat.includes('thể thao') || cat.includes('the thao') || cat.includes('sport')) {
+    return { cls: 'poster-ocean', icon: 'trophy' };
+  }
+  if (cat.includes('sân khấu') || cat.includes('triển lãm') || cat.includes('nghệ thuật')) {
+    return { cls: 'poster-royal', icon: 'mask' };
+  }
+  if (cat.includes('workshop')) {
+    return { cls: 'poster-fest', icon: 'star' };
+  }
+  if (cat.includes('giải trí') || cat.includes('du lịch')) {
+    return { cls: 'poster-sunset', icon: 'star' };
   }
   const variants = ['poster-fest', 'poster-sunset', 'poster-ocean', 'poster-royal'];
   return { cls: variants[(Number(id) || 0) % variants.length], icon: 'star' };
@@ -96,6 +108,27 @@ function PosterArtwork({ kind }) {
         <polygon points="0,0 120,0 60,140 0,140" fill="rgba(255,255,255,0.08)" />
         <rect x="184" y="34" width="104" height="68" rx="10" stroke="rgba(255,255,255,0.75)" strokeWidth="3" />
         <path d="M204 58h64M204 74h40" stroke="rgba(255,255,255,0.8)" strokeWidth="3.5" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (kind === 'trophy') {
+    return (
+      <svg className="poster-svg" viewBox="0 0 320 140" fill="none" aria-hidden="true">
+        <circle cx="255" cy="70" r="68" fill="rgba(255,255,255,0.1)" />
+        <path d="M215 40h50v24a25 25 0 0 1-50 0V40Z" stroke="rgba(255,255,255,0.88)" strokeWidth="3.2" />
+        <path d="M240 89v16M224 105h32" stroke="rgba(255,255,255,0.88)" strokeWidth="3.2" strokeLinecap="round" />
+        <path d="M26 98h70M42 112h45" stroke="rgba(255,255,255,0.35)" strokeWidth="4" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (kind === 'mask') {
+    return (
+      <svg className="poster-svg" viewBox="0 0 320 140" fill="none" aria-hidden="true">
+        <circle cx="70" cy="20" r="60" fill="rgba(255,255,255,0.09)" />
+        <rect x="195" y="32" width="84" height="76" rx="38" stroke="rgba(255,255,255,0.82)" strokeWidth="3" />
+        <circle cx="222" cy="62" r="4" fill="rgba(255,255,255,0.9)" />
+        <circle cx="252" cy="62" r="4" fill="rgba(255,255,255,0.9)" />
+        <path d="M222 82c8 8 22 8 30 0" stroke="rgba(255,255,255,0.88)" strokeWidth="3" strokeLinecap="round" />
       </svg>
     );
   }

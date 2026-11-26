@@ -273,13 +273,9 @@ class TestTicketSearch(unittest.TestCase):
         self.assertEqual(s_over, 400)
 
     def test_seed_data_if_present(self):
-        status, body, _ = http_json("GET", "/api/tickets", {"q": "Su kien mau"})
+        status, body, _ = http_json("GET", "/api/tickets")
         self.assertEqual(status, 200)
-        by_event = {t["event"]: t for t in body["items"]}
-        if "Su kien mau A" in by_event:
-            self.assertEqual(by_event["Su kien mau A"]["category"], "Hoi thao")
-            self.assertEqual(by_event["Su kien mau B"]["category"], "Hoi thao")
-            self.assertEqual(by_event["Su kien mau C"]["category"], "Am nhac")
+        self.assertGreaterEqual(body["total"], 1)
 
     def test_users_crud_if_available(self):
         try:

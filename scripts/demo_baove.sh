@@ -206,13 +206,13 @@ part_2_search_security() {
     "Truy vấn tham số hoá chống SQLi, escape ILIKE (%, _, \\), tìm danh mục phía server, kẹp biên không 4xx."
 
   step "2.1 Tìm theo tên không phân biệt hoa/thường & bỏ khoảng trắng (AC1):"
-  api_table "Tìm q='  MAU  '" "${BASE_URL}/api/tickets?q=%20%20MAU%20%20"
+  api_table "Tìm q='  CONCERT  '" "${BASE_URL}/api/tickets?q=%20%20CONCERT%20%20"
 
   step "2.2 Kết hợp từ khoá + danh mục chính xác (AC2 + AC3):"
-  api_table "Lọc q='mau' & category='Am nhac'" "${BASE_URL}/api/tickets?q=mau&category=Am%20nhac"
+  api_table "Lọc q='Hà Nội' & category='Âm nhạc'" "${BASE_URL}/api/tickets?q=H%C3%A0%20N%E1%BB%99i&category=%C3%82m%20nh%E1%BA%A1c"
 
   step "2.3 Tìm danh mục phía server (AC10 — hỗ trợ hàng trăm danh mục):"
-  api_table "GET /api/tickets/categories?q=hoi&limit=20" "${BASE_URL}/api/tickets/categories?q=hoi&limit=20"
+  api_table "GET /api/tickets/categories?q=công&limit=20" "${BASE_URL}/api/tickets/categories?q=c%C3%B4ng&limit=20"
 
   step "2.4 Kiểm chứng Phòng thủ bảo mật & Xử lý biên (AC6, AC20, AC21):"
   api_table "Escape ký tự đặc biệt q='%' (không khớp tất cả!)" "${BASE_URL}/api/tickets?q=%25"
