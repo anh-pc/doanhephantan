@@ -586,8 +586,8 @@ body {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
 }
 
 .product-card {
@@ -1733,9 +1733,9 @@ code:focus-visible {
   color: var(--color-text-muted);
 }
 
-.footer-links a {
+.footer-link {
   color: var(--color-accent-text);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.4;
   text-decoration: underline;
@@ -1744,14 +1744,9 @@ code:focus-visible {
 
 /* ===== RESPONSIVE 1100px / 768px / 360px ===== */
 @media (max-width: 1050px) {
-  .promo-hero,
   .crm-layout,
   .scenario-grid {
     grid-template-columns: 1fr;
-  }
-
-  .promo-side-cards {
-    flex-direction: row;
   }
 
   .product-grid {
