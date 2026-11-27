@@ -1221,24 +1221,10 @@ export default function App() {
             <span>Đăng vé</span>
           </button>
         </div>
-      </header>
 
-      <main className="container main-body">
-        {/* ===== MÀN HÌNH 1: KỆ VÉ (TỐI GIẢN CHỮ, ƯU TIÊN THỊ GIÁC) ===== */}
-        <div hidden={activeView !== 'tickets'}>
-          <h1 className="sr-only">Sàn Vé Sự Kiện</h1>
-
-          {storeBannerNotice && (
-            <div className="toast-strip" role="status" aria-live="polite">
-              <span>✓ {storeBannerNotice}</span>
-              <button type="button" className="toast-close" onClick={() => setStoreBannerNotice('')} aria-label="Đóng">
-                ×
-              </button>
-            </div>
-          )}
-
-          {/* Thanh lọc gọn gàng 1 hàng duy nhất */}
-          <section className="catalog-filter-bar" aria-label="Bộ lọc danh mục">
+        {/* Thanh lọc Danh mục gắn liền dưới Header — luôn ghim cố định khi cuộn lên/xuống */}
+        <div className="sticky-filter-dock" hidden={activeView !== 'tickets'}>
+          <div className="container catalog-filter-bar" role="region" aria-label="Bộ lọc danh mục">
             <div className="catalog-filter-left">
               <label className="filter-bar-label" htmlFor="ts-category-input">Danh mục</label>
 
@@ -1326,11 +1312,14 @@ export default function App() {
                 )}
               </div>
 
-              {hasActiveFilter && (
-                <button type="button" className="btn-secondary btn-compact" onClick={clearAllFilters}>
-                  Xoá bộ lọc
-                </button>
-              )}
+              <button
+                type="button"
+                className="btn-secondary btn-compact"
+                disabled={!hasActiveFilter}
+                onClick={clearAllFilters}
+              >
+                Xoá bộ lọc
+              </button>
             </div>
 
             <div className="catalog-filter-right" aria-live="polite" aria-atomic="true">
@@ -1338,7 +1327,23 @@ export default function App() {
               <span className="result-count-text"><b>{total}</b> vé</span>
               {totalPages > 1 && <span className="mini-pager">{page}/{displayTotalPages}</span>}
             </div>
-          </section>
+          </div>
+        </div>
+      </header>
+
+      <main className="container main-body">
+        {/* ===== MÀN HÌNH 1: KỆ VÉ (TỐI GIẢN CHỮ, ƯU TIÊN THỊ GIÁC) ===== */}
+        <div hidden={activeView !== 'tickets'}>
+          <h1 className="sr-only">Sàn Vé Sự Kiện</h1>
+
+          {storeBannerNotice && (
+            <div className="toast-strip" role="status" aria-live="polite">
+              <span>✓ {storeBannerNotice}</span>
+              <button type="button" className="toast-close" onClick={() => setStoreBannerNotice('')} aria-label="Đóng">
+                ×
+              </button>
+            </div>
+          )}
 
           {error && (
             <div className="state-box state-error" role="alert">
