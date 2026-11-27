@@ -267,30 +267,38 @@ def get_ticket(ticket_id):
     return jsonify(ticket=serialize(rows[0]), served_by=HOSTNAME)
 
 
-@app.post("/api/tickets")
-def create_ticket():
-    body = request.get_json(silent=True) or {}
+def _validate_ticket_payload(body):
     raw_event = body.get("event", "")
     raw_category = body.get("category")
     event = "".join(ch for ch in str(raw_event or "") if unicodedata.category(ch) != "Cc").strip()
     cat_clean = "".join(ch for ch in str(raw_category or "") if unicodedata.category(ch) != "Cc").strip()
     if len(event) > MAX_EVENT_LEN or len(cat_clean) > MAX_TEXT_LEN:
-        return jsonify(error="dữ liệu vượt quá độ dài cho phép"), 400
+        return None, "dữ liệu vượt quá độ dài cho phép"
     category = cat_clean or DEFAULT_CATEGORY
 
     raw_price = body.get("price")
     raw_qty = body.get("quantity")
     if isinstance(raw_price, bool) or isinstance(raw_qty, bool):
-        return jsonify(error="price và quantity phải là số"), 400
+        return None, "price và quantity phải là số"
     try:
         price = float(raw_price)
         quantity = int(raw_qty)
         if float(raw_qty) != quantity:
-            return jsonify(error="quantity phải là số nguyên"), 400
+            return None, "quantity phải là số nguyên"
     except (TypeError, ValueError):
-        return jsonify(error="price và quantity phải là số"), 400
+        return None, "price và quantity phải là số"
     if not math.isfinite(price) or not event or price < 0 or price > 9999999999.99 or quantity < 0:
-        return jsonify(error="dữ liệu không hợp lệ"), 400
+        return None, "dữ liệu không hợp lệ"
+    return (event, price, quantity, category), None
+
+
+@app.post("/api/tickets")
+def create_ticket():
+    body = request.get_json(silent=True) or {}
+    parsed, err_msg = _validate_ticket_payload(body)
+    if err_msg:
+        return jsonify(error=err_msg), 400
+    event, price, quantity, category = parsed
     row = query(
         "INSERT INTO tickets (event, price, quantity, category) VALUES (%s,%s,%s,%s) RETURNING *",
         (event, price, quantity, category),
@@ -298,3 +306,30 @@ def create_ticket():
     )[0]
     cache_delete("tickets:list", "tickets:stats")  # vô hiệu hoá cache khi dữ liệu đổi
     return jsonify(ticket=serialize(row), served_by=HOSTNAME), 201
+
+
+@app.put("/api/tickets/<int:ticket_id>")
+def update_ticket(ticket_id):
+    body = request.get_json(silent=True) or {}
+    parsed, err_msg = _validate_ticket_payload(body)
+    if err_msg:
+        return jsonify(error=err_msg), 400
+    event, price, quantity, category = parsed
+    rows = query(
+        "UPDATE tickets SET event=%s, price=%s, quantity=%s, category=%s WHERE id=%s RETURNING *",
+        (event, price, quantity, category, ticket_id),
+        commit=True,
+    )
+    if not rows:
+        return jsonify(error="not found"), 404
+    cache_delete("tickets:list", "tickets:stats")
+    return jsonify(ticket=serialize(rows[0]), served_by=HOSTNAME)
+
+
+@app.delete("/api/tickets/<int:ticket_id>")
+def delete_ticket(ticket_id):
+    rows = query("DELETE FROM tickets WHERE id=%s RETURNING *", (ticket_id,), commit=True)
+    if not rows:
+        return jsonify(error="not found"), 404
+    cache_delete("tickets:list", "tickets:stats")
+    return jsonify(deleted=serialize(rows[0]), served_by=HOSTNAME)

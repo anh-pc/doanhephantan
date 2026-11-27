@@ -94,8 +94,8 @@ docker compose exec -T postgres psql -U postgres -d tickets_db -c \
 | GET / PUT / DELETE | `/api/users/{id}` | Chi tiết / cập nhật / xoá người dùng |
 | GET | `/api/tickets` | Danh sách vé (cache Redis 30 s khi không truyền tham số); hỗ trợ lọc/phân trang `?q=&category=&page=&page_size=` (đọc trực tiếp PostgreSQL) |
 | POST | `/api/tickets` | Tạo vé mới (nhận `category` tuỳ chọn, mặc định `'Khac'`; tự xoá cache) |
+| GET / PUT / DELETE | `/api/tickets/{id}` | Chi tiết / cập nhật / xoá vé (tự xoá cache Redis) |
 | GET | `/api/tickets/categories` | Tìm danh sách danh mục phân biệt `?q=&limit=` (mặc định 20, tối đa 50) |
-| GET | `/api/tickets/{id}` | Chi tiết vé |
 | GET | `/api/tickets/stats` | Thống kê nặng mô phỏng `pg_sleep(0.5)`, cache Redis 60 s |
 | GET | `/api/tickets/whoami` | Trả tên container xử lý (phục vụ đo cân bằng tải) |
 

@@ -277,6 +277,40 @@ class TestTicketSearch(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertGreaterEqual(body["total"], 1)
 
+    def test_tickets_update_and_delete(self):
+        crud_tag = f"tcrud-{int(time.time() * 1000)}"
+        s_create, b_create, _ = http_json(
+            "POST",
+            "/api/tickets",
+            payload={"event": f"{crud_tag} Init", "price": 120000, "quantity": 15, "category": "Hội thảo"},
+        )
+        self.assertEqual(s_create, 201)
+        tid = b_create["ticket"]["id"]
+
+        # Warm cache before PUT
+        http_json("GET", "/api/tickets")
+        s_upd, b_upd, _ = http_json(
+            "PUT",
+            f"/api/tickets/{tid}",
+            payload={"event": f"{crud_tag} Updated", "price": 180000, "quantity": 9, "category": "Công nghệ"},
+        )
+        self.assertEqual(s_upd, 200)
+        self.assertEqual(b_upd["ticket"]["event"], f"{crud_tag} Updated")
+        self.assertEqual(b_upd["ticket"]["quantity"], 9)
+
+        # Cache must be invalidated after PUT
+        s_list, b_list, _ = http_json("GET", "/api/tickets")
+        self.assertEqual(s_list, 200)
+        self.assertTrue(any(t["id"] == tid and t["event"] == f"{crud_tag} Updated" for t in b_list["items"]))
+
+        s_del, _, _ = http_json("DELETE", f"/api/tickets/{tid}")
+        self.assertEqual(s_del, 200)
+
+        s_get404, _, _ = http_json("GET", f"/api/tickets/{tid}")
+        self.assertEqual(s_get404, 404)
+        s_del404, _, _ = http_json("DELETE", f"/api/tickets/{tid}")
+        self.assertEqual(s_del404, 404)
+
     def test_users_crud_if_available(self):
         try:
             s_health, _, _ = http_json("GET", "/api/users/health", timeout=3)
