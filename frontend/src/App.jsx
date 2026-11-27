@@ -228,14 +228,11 @@ function ClusterTopology({ activeDataNode }) {
   return (
     <div className="topology-card">
       <div className="topology-head">
-        <div>
-          <span className="eyebrow-tech">LIVE ARCHITECTURE TOPOLOGY</span>
-          <h3 className="topology-title">Sơ đồ kiến trúc &amp; trạng thái nút thời gian thực</h3>
-        </div>
+        <h3 className="topology-title">Sơ đồ kiến trúc &amp; trạng thái nút trực tiếp</h3>
         <div className="topology-actions">
           {activeDataNode && (
             <span className={`live-route-badge ${isRedisActive ? 'is-redis' : 'is-pg'}`}>
-              {isRedisActive ? '⚡ Luồng đọc gần nhất: Redis HIT' : '🗄 Luồng đọc gần nhất: PostgreSQL'}
+              {isRedisActive ? '⚡ Đọc gần nhất: Redis HIT' : '🗄 Đọc gần nhất: PostgreSQL'}
             </span>
           )}
           <button
@@ -244,7 +241,7 @@ function ClusterTopology({ activeDataNode }) {
             disabled={probing}
             onClick={runHealthProbe}
           >
-            {probing ? 'Đang dò...' : '↻ Kiểm tra sức khoẻ cụm'}
+            {probing ? 'Đang dò...' : '↻ Kiểm tra cụm'}
           </button>
         </div>
       </div>
@@ -258,10 +255,10 @@ function ClusterTopology({ activeDataNode }) {
         <div className="topo-node topo-gateway">
           <div className="topo-node-top">
             <span className={`dot-indicator ${probes.gateway.ok === false ? 'is-down' : 'is-up'}`} />
-            <span className="topo-port">:8080 · Mạng edge</span>
+            <strong>Nginx Gateway</strong>
+            <span className="topo-port">:8080</span>
           </div>
-          <strong>Nginx API Gateway</strong>
-          <span className="topo-desc">Reverse Proxy · Round-Robin · Passive Failover</span>
+          <span className="topo-desc">Round-Robin · Failover</span>
           {probes.gateway.ms !== null && (
             <span className="topo-latency">{probes.gateway.ok ? `OK · ${probes.gateway.ms} ms` : 'Mất kết nối'}</span>
           )}
@@ -277,13 +274,12 @@ function ClusterTopology({ activeDataNode }) {
           <div className="topo-node">
             <div className="topo-node-top">
               <span className={`dot-indicator ${probes.tickets.ok === false ? 'is-down' : 'is-up'}`} />
-              <span className="topo-port">:5000 ×N bản sao</span>
+              <strong>Ticket Service</strong>
+              <span className="topo-port">:5000 ×N</span>
             </div>
-            <strong>Ticket Service (Flask)</strong>
-            <span className="topo-desc">Stateless · Gunicorn Workers</span>
             {probes.tickets.ms !== null && (
               <span className="topo-latency">
-                {probes.tickets.ok ? `Replica: ${probes.tickets.by} (${probes.tickets.ms} ms)` : 'Ngừng phản hồi'}
+                {probes.tickets.ok ? `${probes.tickets.by} · ${probes.tickets.ms} ms` : 'Ngừng phản hồi'}
               </span>
             )}
           </div>
@@ -291,13 +287,12 @@ function ClusterTopology({ activeDataNode }) {
           <div className="topo-node">
             <div className="topo-node-top">
               <span className={`dot-indicator ${probes.users.ok === false ? 'is-down' : 'is-up'}`} />
-              <span className="topo-port">:3000 · Độc lập</span>
+              <strong>User Service</strong>
+              <span className="topo-port">:3000</span>
             </div>
-            <strong>User Service (Node.js)</strong>
-            <span className="topo-desc">Express · Cô lập lỗi riêng</span>
             {probes.users.ms !== null && (
               <span className="topo-latency">
-                {probes.users.ok ? `Node: ${probes.users.by} (${probes.users.ms} ms)` : 'Ngừng phản hồi'}
+                {probes.users.ok ? `${probes.users.by} · ${probes.users.ms} ms` : 'Ngừng phản hồi'}
               </span>
             )}
           </div>
@@ -313,19 +308,19 @@ function ClusterTopology({ activeDataNode }) {
           <div className={`topo-node${isRedisActive ? ' is-active-redis' : ''}`}>
             <div className="topo-node-top">
               <span className="dot-indicator is-up" />
-              <span className="topo-port">:6379 · Mạng data</span>
+              <strong>Redis 7 Cache</strong>
+              <span className="topo-port">:6379</span>
             </div>
-            <strong>Redis 7 Cache-Aside</strong>
-            <span className="topo-desc">TTL 30–60s · Suy giảm êm khi tắt</span>
+            <span className="topo-desc">TTL 30–60s · Cache-Aside</span>
           </div>
 
           <div className={`topo-node${isPgActive ? ' is-active-pg' : ''}`}>
             <div className="topo-node-top">
               <span className="dot-indicator is-up" />
-              <span className="topo-port">:5432 · Mạng data</span>
+              <strong>PostgreSQL 16</strong>
+              <span className="topo-port">:5432</span>
             </div>
-            <strong>PostgreSQL 16 (×2 DB)</strong>
-            <span className="topo-desc">tickets_db · users_db riêng biệt</span>
+            <span className="topo-desc">tickets_db · users_db</span>
           </div>
         </div>
       </div>
@@ -433,10 +428,7 @@ function LoadBalancer() {
   return (
     <div className="lab-scenarios" aria-labelledby="lb-heading">
       <div className="lab-header-row">
-        <div>
-          <span className="eyebrow-tech">INTERACTIVE VERIFICATION BENCH</span>
-          <h3 id="lb-heading" className="lb-heading">Ba kịch bản kiểm chứng hệ phân tán trực tiếp</h3>
-        </div>
+        <h3 id="lb-heading" className="lb-heading">Ba kịch bản kiểm chứng hệ phân tán trực tiếp</h3>
       </div>
 
       {lbError && (
@@ -447,7 +439,7 @@ function LoadBalancer() {
         {/* KỊCH BẢN 01: CÂN BẰNG TẢI */}
         <article className="scenario-card">
           <div className="scenario-top">
-            <span className="scenario-badge">01 · LOAD BALANCING</span>
+            <span className="scenario-badge">01 · CHIA TẢI</span>
             <div className="burst-selector" role="group" aria-label="Chọn số lượng request">
               {[30, 60, 100].map(n => (
                 <button
@@ -456,13 +448,13 @@ function LoadBalancer() {
                   className={`burst-chip${burstSize === n ? ' is-selected' : ''}`}
                   onClick={() => setBurstSize(n)}
                 >
-                  {n} req
+                  {n}
                 </button>
               ))}
             </div>
           </div>
 
-          <h4 className="scenario-title">Phân phối tải Round-Robin</h4>
+          <h4 className="scenario-title">Round-Robin qua Nginx</h4>
 
           <button
             type="button"
@@ -515,13 +507,13 @@ function LoadBalancer() {
         {/* KỊCH BẢN 02: BỘ NHỚ ĐỆM REDIS */}
         <article className="scenario-card">
           <div className="scenario-top">
-            <span className="scenario-badge">02 · REDIS CACHE-ASIDE</span>
+            <span className="scenario-badge">02 · REDIS CACHE</span>
             {speedupFactor && (
-              <span className="speedup-pill">⚡ Nhanh hơn {speedupFactor}×</span>
+              <span className="speedup-pill">⚡ {speedupFactor}×</span>
             )}
           </div>
 
-          <h4 className="scenario-title">Đo tốc độ MISS (DB) vs HIT (RAM)</h4>
+          <h4 className="scenario-title">Đo tốc độ MISS vs HIT</h4>
 
           <button
             type="button"
@@ -582,10 +574,10 @@ function LoadBalancer() {
         {/* KỊCH BẢN 03: CONSOLE LỆNH CHỊU LỖI & SCALE */}
         <article className="scenario-card scenario-terminal">
           <div className="scenario-top">
-            <span className="scenario-badge badge-dark">03 · CHAOS &amp; SCALING CLI</span>
+            <span className="scenario-badge badge-dark">03 · LỆNH UBUNTU</span>
           </div>
 
-          <h4 className="scenario-title title-light">Điều khiển cụm trên Ubuntu</h4>
+          <h4 className="scenario-title title-light">Scale &amp; Dừng nóng container</h4>
 
           <div className="term-block">
             <div className="term-label-row">
@@ -636,11 +628,8 @@ function TechnicalEvidenceSection() {
   return (
     <div className="surface-card evidence-block">
       <div className="form-header-row">
-        <div>
-          <span className="eyebrow-tech">VERIFIED BENCHMARK METRICS</span>
-          <h3 className="lb-heading">Bảng đối chiếu kết quả thực nghiệm chuẩn (300 request)</h3>
-        </div>
-        <span className="active-tag">scripts/lb_test.py --n 300</span>
+        <h3 className="lb-heading">Số liệu thực nghiệm chuẩn (300 request)</h3>
+        <span className="active-tag">lb_test.py --n 300</span>
       </div>
 
       <dl className="evidence-metrics">
@@ -1497,7 +1486,7 @@ export default function App() {
 
   return (
     <>
-      {/* ===== THANH ĐIỀU HƯỚNG QUẢN TRỊ CHUYÊN NGHIỆP (GHIM CỐ ĐỊNH KHI CUỘN) ===== */}
+      {/* ===== THANH ĐIỀU HƯỚNG QUẢN TRỊ GỌN GÀNG (GHIM CỐ ĐỊNH KHI CUỘN) ===== */}
       <header className="admin-header">
         <div className="container admin-header-inner">
           <button
@@ -1509,10 +1498,7 @@ export default function App() {
             }}
           >
             <span className="brand-badge"><IconTicketNav /></span>
-            <div className="brand-texts">
-              <h1 className="brand-title">Bán vé giá rẻ</h1>
-              <span className="brand-subtitle">Quản lý Vé · Khách hàng · Hệ phân tán</span>
-            </div>
+            <h1 className="brand-title">Bán vé giá rẻ</h1>
           </button>
 
           <nav className="admin-tabs" role="tablist" aria-label="Chuyển phân hệ quản trị">
@@ -1536,7 +1522,7 @@ export default function App() {
               onClick={() => setActiveView('users')}
             >
               <IconUsersNav />
-              <span>Quản lý khách hàng</span>
+              <span>Khách hàng</span>
               {userCount !== null && <span className="tab-pill">{userCount}</span>}
             </button>
 
@@ -1548,18 +1534,18 @@ export default function App() {
               onClick={() => setActiveView('lab')}
             >
               <IconPulseNav />
-              <span>Giám sát hệ thống</span>
+              <span>Hệ thống</span>
             </button>
           </nav>
 
           <div className="header-status" aria-live="polite">
-            {gatewayStatus === 'online' && <span className="gw-pill is-online">● Gateway :8080</span>}
+            {gatewayStatus === 'online' && <span className="gw-pill is-online">● :8080</span>}
             {gatewayStatus === 'offline' && <span className="gw-pill is-offline">▲ Mất kết nối</span>}
-            {gatewayStatus === 'checking' && <span className="gw-pill">◌ Đang kết nối</span>}
+            {gatewayStatus === 'checking' && <span className="gw-pill">◌ Đang nối</span>}
           </div>
         </div>
 
-        {/* Thanh tìm kiếm & lọc vé gắn liền dưới Header (chỉ hiện ở phân hệ Quản lý vé, luôn ghim cố định) */}
+        {/* Thanh tìm kiếm & lọc vé 1 hàng gọn gàng (chỉ hiện ở phân hệ Quản lý vé) */}
         <div className="sticky-ticket-bar" hidden={activeView !== 'tickets'}>
           <div className="container ticket-bar-inner" role="search" aria-label="Tìm kiếm và lọc vé">
             <div className="ticket-bar-filters">
@@ -1569,7 +1555,7 @@ export default function App() {
                   ref={searchInputRef}
                   id="ts-search-input"
                   type="text"
-                  className="field-input input-with-action"
+                  className="field-input field-input-sm input-with-action"
                   placeholder="Tìm tên sự kiện..."
                   maxLength={100}
                   value={searchInput}
@@ -1594,7 +1580,7 @@ export default function App() {
                   id="ts-category-input"
                   type="text"
                   role="combobox"
-                  className="field-input input-with-action"
+                  className="field-input field-input-sm input-with-action"
                   placeholder="Tất cả danh mục"
                   maxLength={100}
                   autoComplete="off"
@@ -1673,14 +1659,15 @@ export default function App() {
                 )}
               </div>
 
-              <button
-                type="button"
-                className="btn-secondary btn-compact"
-                disabled={!hasActiveFilter}
-                onClick={clearAllFilters}
-              >
-                Xoá bộ lọc
-              </button>
+              {hasActiveFilter && (
+                <button
+                  type="button"
+                  className="btn-secondary btn-compact"
+                  onClick={clearAllFilters}
+                >
+                  Xoá lọc
+                </button>
+              )}
             </div>
 
             <div className="ticket-bar-actions">
@@ -1690,7 +1677,7 @@ export default function App() {
                   className={`toggle-btn${ticketLayout === 'grid' ? ' is-selected' : ''}`}
                   onClick={() => setTicketLayout('grid')}
                 >
-                  Thẻ vé
+                  Thẻ
                 </button>
                 <button
                   type="button"
@@ -1701,58 +1688,60 @@ export default function App() {
                 </button>
               </div>
 
-              <button type="button" className="btn-primary" onClick={openAddTicketModal}>
+              <button type="button" className="btn-primary btn-compact-main" onClick={openAddTicketModal}>
                 <IconPlus />
-                <span>Thêm vé mới</span>
+                <span>Thêm vé</span>
               </button>
             </div>
           </div>
-
-          {quickCategories.length > 0 && (
-            <div className="container quick-cat-strip">
-              <button
-                type="button"
-                className={`cat-chip${selectedCategory === '' ? ' is-selected' : ''}`}
-                onClick={() => selectCategory('')}
-              >
-                Tất cả ({total})
-              </button>
-              {quickCategories.map(cat => (
-                <button
-                  key={cat}
-                  type="button"
-                  className={`cat-chip${selectedCategory === cat ? ' is-selected' : ''}`}
-                  onClick={() => selectCategory(cat)}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </header>
 
       <main className="container main-body">
         {/* ===== MÀN HÌNH 1: QUẢN LÝ VÉ SỰ KIỆN ===== */}
         <div hidden={activeView !== 'tickets'}>
-          {/* 4 Thẻ chỉ số kho vé (KPI) */}
-          <div className="kpi-row">
-            <div className="kpi-card">
-              <span className="kpi-label">Sự kiện khớp lọc</span>
-              <strong className="kpi-value">{total}</strong>
+          {/* Thanh tóm tắt tồn kho + danh mục nhanh gọn gàng */}
+          <div className="inventory-strip">
+            <div className="kpi-row">
+              <div className="kpi-card">
+                <span className="kpi-label">Sự kiện</span>
+                <strong className="kpi-value">{total}</strong>
+              </div>
+              <div className="kpi-card">
+                <span className="kpi-label">Tồn kho trang</span>
+                <strong className="kpi-value">{pageQuantitySum.toLocaleString('vi-VN')}</strong>
+              </div>
+              <div className="kpi-card">
+                <span className="kpi-label">Danh mục</span>
+                <strong className="kpi-value">{quickCategories.length}</strong>
+              </div>
+              <div className="kpi-card">
+                <span className="kpi-label">Sắp hết (≤10)</span>
+                <strong className={`kpi-value${lowStockCount > 0 ? ' is-warn' : ''}`}>{lowStockCount}</strong>
+              </div>
             </div>
-            <div className="kpi-card">
-              <span className="kpi-label">Tồn kho trang hiện tại</span>
-              <strong className="kpi-value">{pageQuantitySum.toLocaleString('vi-VN')} vé</strong>
-            </div>
-            <div className="kpi-card">
-              <span className="kpi-label">Danh mục đang có</span>
-              <strong className="kpi-value">{quickCategories.length}</strong>
-            </div>
-            <div className="kpi-card">
-              <span className="kpi-label">Sắp hết vé (≤ 10)</span>
-              <strong className={`kpi-value${lowStockCount > 0 ? ' is-warn' : ''}`}>{lowStockCount}</strong>
-            </div>
+
+            {quickCategories.length > 0 && (
+              <div className="quick-cat-strip" role="group" aria-label="Lọc nhanh danh mục">
+                <button
+                  type="button"
+                  className={`cat-chip${selectedCategory === '' ? ' is-selected' : ''}`}
+                  onClick={() => selectCategory('')}
+                >
+                  Tất cả
+                </button>
+                {quickCategories.map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    className={`cat-chip${selectedCategory === cat ? ' is-selected' : ''}`}
+                    onClick={() => selectCategory(cat)}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {activeFilterLabel && (
