@@ -1510,7 +1510,7 @@ export default function App() {
           >
             <span className="brand-badge"><IconTicketNav /></span>
             <div className="brand-texts">
-              <h1 className="brand-title">VietTicket Admin</h1>
+              <h1 className="brand-title">Bán vé giá rẻ</h1>
               <span className="brand-subtitle">Quản lý Vé · Khách hàng · Hệ phân tán</span>
             </div>
           </button>
@@ -2137,7 +2137,7 @@ export default function App() {
       <footer className="admin-footer">
         <div className="container footer-grid">
           <p className="support-note">
-            VietTicket Admin · Đồ án Hệ phân tán · Cần hỗ trợ? Liên hệ quản trị viên hệ thống.
+            Bán vé giá rẻ · Đồ án Hệ phân tán · Cần hỗ trợ? Liên hệ quản trị viên hệ thống.
           </p>
           <a className="footer-link" href="https://github.com/anh-pc/doanhephantan.git" target="_blank" rel="noreferrer">
             GitHub: anh-pc/doanhephantan
